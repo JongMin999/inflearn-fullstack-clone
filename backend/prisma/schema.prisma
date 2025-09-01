@@ -17,5 +17,5 @@ datasource db {
 model Test{
   id String @id @default(uuid())
 
-  @map("test")
+  @@map("test")
 }
