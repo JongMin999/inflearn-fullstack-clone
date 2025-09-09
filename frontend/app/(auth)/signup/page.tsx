@@ -24,7 +24,7 @@ export default function SignupPage() {
   useEffect(() => {
     const timer = setInterval(() => {
       setIndex((prev) => (prev + 1) % messages.length);
-    }, 3000);
+    }, 4000);
     return () => clearInterval(timer);
   }, [messages.length]);
 
