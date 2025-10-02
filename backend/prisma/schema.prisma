@@ -1,5 +1,17 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
 generator client {
   provider = "prisma-client-js"
+}
+
+generator prismaClassGenerator {
+  provider               = "prisma-class-generator"
+  dryRun                 = "false"
+  separateRelationFields = "false"
 }
 
 datasource db {
@@ -80,6 +92,7 @@ model Course {
   level            String   @default("BEGINEER")
   status           String   @default("DRAFT")
   instructorId     String   @map("instructor_id")
+  isPublished      Boolean  @default(false) @map("is_published")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
