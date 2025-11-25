@@ -54,6 +54,7 @@ export default function SignupPage() {
       });
 
       if (result?.status === "ok") {
+        alert(result.message);
         redirect("/signin");
       }
   
