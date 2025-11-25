@@ -30,7 +30,7 @@ export async function signUp({
     });
 
     if (user) {
-      return { status: "ok" };
+      return { status: "ok", message: "회원가입에 성공했습니다." };
     }
   } catch (err) {
     console.error(err);
