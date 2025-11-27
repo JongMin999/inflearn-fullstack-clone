@@ -20,7 +20,7 @@ import { Prisma, Course } from '@prisma/client';
 import { UpdateCourseDto } from './dto/update-course.dto';
 import { Course as CourseEntity } from 'src/_gen/prisma-class/course';
 
-@ApiTags('courses')
+@ApiTags('코스')
 @Controller('courses')
 export class CoursesController {
   constructor(private readonly coursesService: CoursesService) {}
@@ -29,7 +29,7 @@ export class CoursesController {
   @UseGuards(AccessTokenGuard)
   @ApiBearerAuth('access-token')
   @ApiOkResponse({
-    description: '코스 생성성',
+    description: '코스 생성',
     type: CourseEntity,
   })
   create(@Req() req: Request, @Body() createCourseDto: CreateCourseDto) {
@@ -105,7 +105,7 @@ export class CoursesController {
   @UseGuards(AccessTokenGuard)
   @ApiBearerAuth('access-token')
   @ApiOkResponse({
-    description: '코스 수정정',
+    description: '코스 수정',
     type: CourseEntity,
   })
   update(
@@ -116,7 +116,7 @@ export class CoursesController {
     return this.coursesService.update(id, req.user.sub, updateCourseDto);
   }
   @ApiOkResponse({
-    description: '코스 삭제제',
+    description: '코스 삭제',
     type: CourseEntity,
   })
   @Delete(':id')
