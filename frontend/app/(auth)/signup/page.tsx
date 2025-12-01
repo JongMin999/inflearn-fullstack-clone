@@ -91,6 +91,7 @@ export default function SignupPage() {
             <Mail className="h-4 w-4 md:h-5 md:w-5 text-gray-400" />
           </div>
           <input
+            id="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             type="email"
@@ -111,6 +112,7 @@ export default function SignupPage() {
             <Lock className="h-4 w-4 md:h-5 md:w-5 text-gray-400" />
           </div>
           <input
+            id="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             type={showPassword ? "text" : "password"}
@@ -135,6 +137,7 @@ export default function SignupPage() {
             <Lock className="h-4 w-4 md:h-5 md:w-5 text-gray-400" />
           </div>
           <input
+            id="passwordConfirm"
             value={passwordConfirm}
             onChange={(e) => setPasswordConfirm(e.target.value)}
             type={showPasswordConfirm ? "text" : "password"}

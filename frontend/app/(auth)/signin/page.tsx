@@ -4,29 +4,40 @@ import Link from "next/link";
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { Eye, EyeOff, Mail, Lock, LogIn } from "lucide-react"; // 아이콘 import 추가
+import { useRouter } from "next/navigation";
 
 export default function SigninPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState(""); // 에러 메시지 상태
+  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErrorMessage(""); // 이전 에러 초기화
+    setIsLoading(true);
 
-    const result = await signIn("credentials", {
-      redirect: false, //  redirect false로 실패 시 처리 가능
-      email,
-      password,
-    });
+    try {
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
 
-    if (result?.error) {
-      // 서버에서 반환한 에러 메시지
-      setErrorMessage("이메일 또는 비밀번호가 올바르지 않습니다.");
-    } else if (result?.ok) {
-      // 로그인 성공 시 루트 페이지로 이동
-      window.location.href = "/";
+      if (result?.error) {
+        setErrorMessage("이메일 또는 비밀번호가 올바르지 않습니다.");
+        setIsLoading(false);
+      } else if (result?.ok) {
+        // 로그인 성공 시 루트 페이지로 이동
+        router.push("/");
+        router.refresh();
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMessage("로그인 중 오류가 발생했습니다.");
+      setIsLoading(false);
     }
   };
 
@@ -42,6 +53,7 @@ export default function SigninPage() {
             <Mail className="h-4 w-4 md:h-5 md:w-5 text-gray-400" />
           </div>
           <input
+            id="email"
             value={email}
             type="email"
             onChange={(e) => setEmail(e.target.value)}
@@ -61,6 +73,7 @@ export default function SigninPage() {
             <Lock className="h-4 w-4 md:h-5 md:w-5 text-gray-400" />
           </div>
           <input
+            id="password"
             value={password}
             type={showPassword ? "text" : "password"}
             onChange={(e) => setPassword(e.target.value)}
@@ -83,10 +96,11 @@ export default function SigninPage() {
 
         <button
           type="submit"
-          className="bg-green-500 text-white font-bold cursor-pointer rounded-sm p-2 md:p-2.5 flex items-center justify-center gap-2 text-xs md:text-sm lg:text-base"
+          disabled={isLoading}
+          className="bg-green-500 text-white font-bold cursor-pointer rounded-sm p-2 md:p-2.5 flex items-center justify-center gap-2 text-xs md:text-sm lg:text-base disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <LogIn size={16} className="md:w-5 md:h-5" />
-          로그인
+          {isLoading ? "로그인 중..." : "로그인"}
         </button>
 
         <Link href="/signup" className="text-center text-xs md:text-sm text-gray-600 hover:text-gray-800">
