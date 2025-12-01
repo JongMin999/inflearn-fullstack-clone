@@ -64,11 +64,11 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen gap-4">
-      <h1 className="text-3xl font-bold">회원가입</h1>
+    <div className="flex flex-col items-center justify-center min-h-screen pt-20 md:pt-24 pb-8 px-4 gap-3 md:gap-4">
+      <h1 className="text-xl md:text-2xl lg:text-3xl font-bold">회원가입</h1>
 
       {/* 안내 문구 */}
-      <div className="h-6 mb-6 text-center overflow-hidden relative">
+      <div className="h-5 md:h-6 mb-4 md:mb-6 text-center overflow-hidden relative">
         <AnimatePresence mode="wait">
           <motion.p
             key={index}
@@ -76,7 +76,7 @@ export default function SignupPage() {
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -100, opacity: 0 }}
             transition={{ duration: 1 }}
-            className="text-gray-500"
+            className="text-xs md:text-sm lg:text-base text-gray-500"
           >
             {messages[index]}
           </motion.p>
@@ -84,11 +84,11 @@ export default function SignupPage() {
       </div>
 
       {/* 회원가입 폼 */}
-      <form onSubmit={handleSubmit} className="flex flex-col gap-2 min-w-[300px]">
-        <label htmlFor="email">이메일</label>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-2 w-full max-w-[300px] md:max-w-[400px]">
+        <label htmlFor="email" className="text-xs md:text-sm font-medium">이메일</label>
         <div className="relative">
-          <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-            <Mail className="h-5 w-5 text-gray-400" />
+          <div className="absolute inset-y-0 left-2 md:left-3 flex items-center pointer-events-none">
+            <Mail className="h-4 w-4 md:h-5 md:w-5 text-gray-400" />
           </div>
           <input
             value={email}
@@ -96,19 +96,19 @@ export default function SignupPage() {
             type="email"
             name="email"
             placeholder="example@inflab.com"
-            className="w-full border rounded-md p-3 pl-10 focus:outline-none focus:ring-2 focus:ring-green-400"
+            className="w-full border rounded-md p-2 md:p-3 pl-8 md:pl-10 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
             required
           />
         </div>
         {email.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && (
-          <p className="text-sm mt-1 text-red-600">❌ 올바른 이메일 형식이 아닙니다.</p>
+          <p className="text-xs md:text-sm mt-1 text-red-600">❌ 올바른 이메일 형식이 아닙니다.</p>
         )}
 
         {/* 비밀번호 */}
-        <label htmlFor="password">비밀번호</label>
+        <label htmlFor="password" className="text-xs md:text-sm font-medium">비밀번호</label>
         <div className="relative">
-          <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-            <Lock className="h-5 w-5 text-gray-400" />
+          <div className="absolute inset-y-0 left-2 md:left-3 flex items-center pointer-events-none">
+            <Lock className="h-4 w-4 md:h-5 md:w-5 text-gray-400" />
           </div>
           <input
             value={password}
@@ -116,7 +116,7 @@ export default function SignupPage() {
             type={showPassword ? "text" : "password"}
             name="password"
             placeholder="비밀번호를 입력하세요."
-            className="w-full border rounded-md p-3 pl-10 pr-10 focus:outline-none focus:ring-2 focus:ring-green-400"
+            className="w-full border rounded-md p-2 md:p-3 pl-8 md:pl-10 pr-8 md:pr-10 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
             required
           />
           <button
@@ -124,15 +124,15 @@ export default function SignupPage() {
             onClick={() => setShowPassword(!showPassword)}
             className="absolute inset-y-0 right-2 flex items-center text-gray-400 hover:text-gray-600 cursor-pointer"
           >
-            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+            {showPassword ? <EyeOff size={16} className="md:w-5 md:h-5" /> : <Eye size={16} className="md:w-5 md:h-5" />}
           </button>
         </div>
 
         {/* 비밀번호 확인 */}
-        <label htmlFor="passwordConfirm">비밀번호 확인</label>
+        <label htmlFor="passwordConfirm" className="text-xs md:text-sm font-medium">비밀번호 확인</label>
         <div className="relative">
-          <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-            <Lock className="h-5 w-5 text-gray-400" />
+          <div className="absolute inset-y-0 left-2 md:left-3 flex items-center pointer-events-none">
+            <Lock className="h-4 w-4 md:h-5 md:w-5 text-gray-400" />
           </div>
           <input
             value={passwordConfirm}
@@ -140,7 +140,7 @@ export default function SignupPage() {
             type={showPasswordConfirm ? "text" : "password"}
             name="passwordConfirm"
             placeholder="비밀번호를 다시 입력하세요."
-            className="w-full border rounded-md p-3 pl-10 pr-10 focus:outline-none focus:ring-2 focus:ring-green-400"
+            className="w-full border rounded-md p-2 md:p-3 pl-8 md:pl-10 pr-8 md:pr-10 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
             required
           />
           <button
@@ -148,14 +148,14 @@ export default function SignupPage() {
             onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
             className="absolute inset-y-0 right-2 flex items-center text-gray-400 hover:text-gray-600 cursor-pointer"
           >
-            {showPasswordConfirm ? <EyeOff size={20} /> : <Eye size={20} />}
+            {showPasswordConfirm ? <EyeOff size={16} className="md:w-5 md:h-5" /> : <Eye size={16} className="md:w-5 md:h-5" />}
           </button>
         </div>
 
         {/* 비밀번호 일치 여부 */}
         {passwordConfirm.length > 0 && (
           <p
-            className={`text-sm mt-1 ${
+            className={`text-xs md:text-sm mt-1 ${
               password === passwordConfirm ? "text-green-600" : "text-red-600"
             }`}
           >
@@ -168,13 +168,13 @@ export default function SignupPage() {
         {/* 회원가입 버튼 */}
         <button
           type="submit"
-          className="bg-green-500 text-white font-bold cursor-pointer rounded-sm p-2 flex items-center justify-center gap-2"
+          className="bg-green-500 text-white font-bold cursor-pointer rounded-sm p-2 md:p-2.5 flex items-center justify-center gap-2 text-xs md:text-sm lg:text-base"
         >
-          <UserPlus size={20} />
+          <UserPlus size={16} className="md:w-5 md:h-5" />
           회원가입
         </button>
 
-        <Link href="/signin" className="text-center text-sm text-gray-600 hover:text-gray-800">
+        <Link href="/signin" className="text-center text-xs md:text-sm text-gray-600 hover:text-gray-800">
           이미 계정이 있으신가요? 로그인
         </Link>
       </form>
