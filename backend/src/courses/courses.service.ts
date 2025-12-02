@@ -17,11 +17,32 @@ export class CoursesService {
     userId: string,
     createCourseDto: CreateCourseDto,
   ): Promise<Course> {
+    const baseSlug = slugify(createCourseDto.title, {
+      lower: true,
+      strict: true,
+    });
+    
+    // 중복된 slug가 있는지 확인하고 고유한 slug 생성
+    let slug = baseSlug;
+    let counter = 1;
+    
+    while (true) {
+      const existingCourse = await this.prisma.course.findUnique({
+        where: { slug },
+      });
+      
+      if (!existingCourse) {
+        break;
+      }
+      
+      slug = `${baseSlug}-${counter}`;
+      counter++;
+    }
 
     return this.prisma.course.create({
       data: {
         title: createCourseDto.title,
-        slug: slugify(createCourseDto.title),
+        slug,
         instructorId: userId,
         status: 'DRAGT',
       },
@@ -46,18 +67,14 @@ export class CoursesService {
     });
   }
 
-  async findOne(id: string, include?: string[]): Promise<Course | null> {
-    const includeObject = {};
-
-    if (include) {
-      include.forEach((item) => {
-        includeObject[item] = true;
-      });
-    }
+  async findOne(
+    id: string,
+    include?: Prisma.CourseInclude,
+  ): Promise<Course | null> {
 
     const course = await this.prisma.course.findUnique({
       where: { id },
-      include: include?.length > 0 ? includeObject : undefined,
+      include,
     });
 
     return course;
