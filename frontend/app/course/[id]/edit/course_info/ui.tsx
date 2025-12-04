@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
   Form,
@@ -41,17 +42,89 @@ export default function EditCourseInfoUI({ course }: { course: Course }) {
     },
   });
 
-  const { handleSubmit, register, control, setValue, watch } = form;
+  const { handleSubmit, register, control, setValue, watch, formState } = form;
+
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // 세션 스토리지 키
+  const dirtyKey =
+    typeof window !== "undefined"
+      ? `course-edit-dirty-${course.id}`
+      : `course-edit-dirty`;
+
+  // 마운트 시 초기값: 변경 없음
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.sessionStorage.setItem(dirtyKey, "0");
+  }, [dirtyKey]);
+
+  // 폼 값 변경 감지
+  const watchedValues = watch();
+  useEffect(() => {
+    if (!formState.isDirty) return;
+    setHasUnsavedChanges(true);
+    if (typeof window !== "undefined") {
+      window.sessionStorage.setItem(dirtyKey, "1");
+    }
+  }, [watchedValues, formState.isDirty, dirtyKey]);
 
   const updateCourseMutation = useMutation({
-    mutationFn: (data: FormValues) =>
-      api.updateCourse(course.id, {
+    mutationFn: async (data: FormValues) => {
+      const sanitizedData: FormValues = {
         ...data,
-        price: parseInt(data.price),
-        discountPrice: parseInt(data.discountPrice),
-      }),
-    onSuccess: () => {
+        title: data.title.slice(0, 200),
+      };
+
+      const { data: updated, error } = await api.updateCourse(course.id, {
+        ...sanitizedData,
+        price: parseInt(sanitizedData.price),
+        discountPrice: parseInt(sanitizedData.discountPrice),
+      });
+
+      if (error) {
+        let message: string;
+        if (typeof error === "string") {
+          message = error;
+        } else if (error && typeof error === "object") {
+          const anyError: any = error;
+          const rawMessage =
+            anyError.message ||
+            anyError.body?.message ||
+            anyError.response?.data?.message;
+
+          if (Array.isArray(rawMessage)) {
+            message = rawMessage.join("\n");
+          } else if (typeof rawMessage === "string") {
+            message = rawMessage;
+          } else {
+            message =
+              "강의 정보를 저장하는 중 오류가 발생했습니다. 값을 다시 확인해주세요.";
+          }
+        } else {
+          message =
+            "강의 정보를 저장하는 중 오류가 발생했습니다. 값을 다시 확인해주세요.";
+        }
+
+        throw new Error(message);
+      }
+
+      return { updated, variables: sanitizedData };
+    },
+    onSuccess: (result) => {
+      const { variables } = result;
+      // 저장 성공 시 dirty 상태 초기화
+      setHasUnsavedChanges(false);
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(dirtyKey, "0");
+      }
+      // 폼 기준값을 최신 값으로 재설정
+      form.reset(variables);
       toast.success("강의 정보가 성공적으로 업데이트 되었습니다!");
+    },
+    onError: (error: any) => {
+      const message =
+        error?.message ?? "강의 정보를 저장하는 중 오류가 발생했습니다.";
+      toast.error(message);
     },
   });
 
@@ -74,8 +147,11 @@ export default function EditCourseInfoUI({ course }: { course: Course }) {
               <FormControl>
                 <Input
                   {...field}
+                  value={field.value ?? ""}
+                  onChange={(e) => field.onChange(e.target.value.slice(0, 200))}
                   placeholder="강의 제목을 입력하세요"
                   required
+                  maxLength={200}
                   className="text-sm md:text-base py-2 md:py-3 w-full max-w-full"
                 />
               </FormControl>
