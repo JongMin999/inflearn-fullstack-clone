@@ -51,8 +51,9 @@ export default function UI() {
       <Input
         type="text"
         value={title}
-        onChange={(e) => setTitle(e.target.value)}
+        onChange={(e) => setTitle(e.target.value.slice(0, 200))}
         placeholder="제목을 입력해주세요."
+        maxLength={200}
         className="bg-[#F6F6F6] py-4 md:py-5 lg:py-6 rounded-xs text-xs md:text-sm lg:text-base w-full"
       />
       <div className="flex gap-2 md:gap-3 w-full justify-center flex-wrap">
@@ -64,7 +65,15 @@ export default function UI() {
           이전
         </Button>
         <Button
-          onClick={() => createCourseMutation.mutate()}
+          onClick={() => {
+            const trimmed = title.trim().slice(0, 200);
+            if (!trimmed) {
+              toast.error("제목을 입력해주세요.");
+              return;
+            }
+            setTitle(trimmed);
+            createCourseMutation.mutate();
+          }}
           disabled={createCourseMutation.isPending || !title.trim()}
           variant={"default"}
           className="px-4 md:px-6 lg:px-8 py-3 md:py-4 lg:py-6 text-xs md:text-sm lg:text-base font-bold whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"

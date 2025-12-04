@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -56,6 +56,11 @@ export default function UI({ initialCourse }: { initialCourse: Course }) {
   const [lectureEditMode, setLectureEditMode] = useState<Record<string, boolean>>(
     {}
   );
+  const [sectionToDelete, setSectionToDelete] = useState<Section | null>(null);
+  const [isSectionDeleteDialogOpen, setIsSectionDeleteDialogOpen] =
+    useState(false);
+  const [lectureToDelete, setLectureToDelete] = useState<Lecture | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   // 코스 데이터 조회
   const { data: course } = useQuery<Course>({
@@ -198,13 +203,30 @@ export default function UI({ initialCourse }: { initialCourse: Course }) {
 
   // UI 핸들러
   const handleAddSection = () => {
-    // '섹션 제목을 작성해주세요'로 바로 생성
-    addSectionMutation.mutate("섹션 제목을 작성해주세요");
+    const title = (addSectionTitle.trim() || "섹션 제목을 작성해주세요").slice(
+      0,
+      200
+    );
+
+    addSectionMutation.mutate(title);
     setAddSectionTitle("");
   };
 
-  const handleDeleteSection = (sectionId: string) => {
-    deleteSectionMutation.mutate(sectionId);
+  const requestDeleteSection = (section: Section) => {
+    setSectionToDelete(section);
+    setIsSectionDeleteDialogOpen(true);
+  };
+
+  const handleDeleteSection = () => {
+    if (!sectionToDelete) return;
+    deleteSectionMutation.mutate(sectionToDelete.id);
+    setIsSectionDeleteDialogOpen(false);
+    setSectionToDelete(null);
+  };
+
+  const handleDismissSectionDeleteDialog = () => {
+    setIsSectionDeleteDialogOpen(false);
+    setSectionToDelete(null);
   };
 
   const openLectureDialog = (sectionId: string) => {
@@ -214,10 +236,12 @@ export default function UI({ initialCourse }: { initialCourse: Course }) {
   };
 
   const handleAddLecture = () => {
-    if (!addLectureTitle.trim() || !addLectureSectionId) return;
+    const title = addLectureTitle.trim().slice(0, 200);
+    if (!title || !addLectureSectionId) return;
+
     addLectureMutation.mutate({
       sectionId: addLectureSectionId,
-      title: addLectureTitle,
+      title,
     });
     setLectureDialogOpen(false);
     setAddLectureTitle("");
@@ -282,11 +306,26 @@ export default function UI({ initialCourse }: { initialCourse: Course }) {
     toggleLecturePreviewMutation.mutate(lecture);
   };
 
-  const handleDeleteLecture = (lectureId: string) => {
-    deleteLectureMutation.mutate({ lectureId });
+  const requestDeleteLecture = (lecture: Lecture) => {
+    setLectureToDelete(lecture);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteLecture = () => {
+    if (!lectureToDelete) return;
+    deleteLectureMutation.mutate({ lectureId: lectureToDelete.id });
+    setIsDeleteDialogOpen(false);
+    setLectureToDelete(null);
+  };
+
+  const handleDismissDeleteDialog = () => {
+    setIsDeleteDialogOpen(false);
+    setLectureToDelete(null);
   };
 
   // 강의 미리보기 토글, 섹션 공개/비공개 토글 등은 TODO: mutation 추가 필요
+
+  // (섹션/수업 제목 200자 검사는 각 인풋의 maxLength로만 처리)
 
   if (!course) return <div>코스 정보를 불러올 수 없습니다.</div>;
 
@@ -311,14 +350,16 @@ return (
               <Input
                 className="w-32 md:w-48 lg:w-64 text-xs md:text-sm flex-1 min-w-0 max-w-full"
                 value={sectionTitles[section.id] ?? section.title}
+                maxLength={200}
                 onChange={(e) => {
                   setSectionTitles((prev) => ({
                     ...prev,
-                    [section.id]: e.target.value,
+                    [section.id]: e.target.value.slice(0, 200),
                   }));
                 }}
                 onBlur={(e) => {
                   const newTitle = e.target.value.trim();
+
                   if (newTitle && newTitle !== section.title) {
                     updateSectionTitleMutation.mutate({
                       sectionId: section.id,
@@ -333,7 +374,7 @@ return (
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => handleDeleteSection(section.id)}
+                onClick={() => requestDeleteSection(section)}
                 className="text-red-500 hover:bg-red-100"
                 aria-label="섹션 삭제"
               >
@@ -359,52 +400,40 @@ return (
                     <Input
                       className="flex-1 min-w-0 max-w-full border-0 shadow-none focus-visible:ring-0 px-0 font-medium text-xs md:text-sm"
                       value={lectureTitles[lecture.id] ?? lecture.title}
+                      maxLength={200}
                       onChange={(e) => {
                         setLectureTitles((prev) => ({
                           ...prev,
-                          [lecture.id]: e.target.value,
+                          [lecture.id]: e.target.value.slice(0, 200),
                         }));
                       }}
                       onBlur={(e) => {
-                        const newTitle = e.target.value.trim();
+                        const newTitle = e.target.value.trim().slice(0, 200);
+
                         if (newTitle && newTitle !== lecture.title) {
                           updateLectureTitleMutation.mutate({
                             lectureId: lecture.id,
                             title: newTitle,
                           });
                         } else {
-                          // 변경사항이 없으면 원래 제목으로 복원
                           setLectureTitles((prev) => {
                             const updated = { ...prev };
                             delete updated[lecture.id];
                             return updated;
                           });
                         }
-                        // 수정 모드 해제
+
                         setLectureEditMode((prev) => ({
                           ...prev,
                           [lecture.id]: false,
                         }));
                       }}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.currentTarget.blur();
-                        }
-                        if (e.key === "Escape") {
-                          setLectureTitles((prev) => {
-                            const updated = { ...prev };
-                            delete updated[lecture.id];
-                            return updated;
-                          });
-                          setLectureEditMode((prev) => ({
-                            ...prev,
-                            [lecture.id]: false,
-                          }));
+                        if (e.key === "Enter" || e.key === "Escape") {
                           e.currentTarget.blur();
                         }
                       }}
                       placeholder="강의 제목을 입력하세요."
-                      maxLength={200}
                       autoFocus
                     />
                   ) : (
@@ -462,9 +491,9 @@ return (
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => handleDeleteLecture(lecture.id)}
+                    onClick={() => requestDeleteLecture(lecture)}
                     className="text-red-500 hover:bg-red-100 h-8 w-8 md:h-10 md:w-10"
-                    aria-label="강의 삭제"
+                    aria-label="수업 삭제"
                   >
                     <Trash2 className="w-4 h-4 md:w-[18px] md:h-[18px]" />
                   </Button>
@@ -491,7 +520,7 @@ return (
           <Input
             className="w-32 md:w-48 lg:w-64 text-xs md:text-sm flex-1 min-w-0 max-w-full"
             value={addSectionTitle}
-            onChange={(e) => setAddSectionTitle(e.target.value)}
+            onChange={(e) => setAddSectionTitle(e.target.value.slice(0, 200))}
             placeholder="섹션 제목을 작성해주세요. (최대 200자)"
             maxLength={200}
           />
@@ -509,7 +538,7 @@ return (
           </DialogHeader>
           <Input
             value={addLectureTitle}
-            onChange={(e) => setAddLectureTitle(e.target.value)}
+            onChange={(e) => setAddLectureTitle(e.target.value.slice(0, 200))}
             placeholder="제목을 입력해주세요. (최대 200자)"
             maxLength={200}
           />
@@ -533,6 +562,45 @@ return (
           onClose={handleCloseEditLectureDialog}
           lecture={editLecture}
         />
+      )}
+
+      {isSectionDeleteDialogOpen && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg w-[90%] max-w-sm p-6 space-y-4 text-center">
+            <p className="text-base font-semibold">섹션을 삭제하시겠습니까?</p>
+            <div className="flex items-center justify-center gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={handleDismissSectionDeleteDialog}
+              >
+                취소
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={handleDeleteSection}
+              >
+                삭제
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isDeleteDialogOpen && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg w-[90%] max-w-sm p-6 space-y-4 text-center">
+            <p className="text-base font-semibold">수업을 삭제하시겠습니까?</p>
+            <div className="flex items-center justify-center gap-3">
+              <Button variant="outline" className="flex-1" onClick={handleDismissDeleteDialog}>
+                취소
+              </Button>
+              <Button className="flex-1" onClick={handleDeleteLecture} disabled={deleteLectureMutation.isPending}>
+                {deleteLectureMutation.isPending ? "삭제 중..." : "삭제"}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
