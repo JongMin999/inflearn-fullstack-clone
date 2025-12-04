@@ -25,6 +25,7 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import * as api from "@/lib/api";
 import { notFound } from "next/navigation";
 import { toast } from "sonner";
+import { EditLectureDialog } from "@/app/course/[id]/edit/curriculum/_componnents/edit-lecture-dialog";
 
 export default function UI({ initialCourse }: { initialCourse: Course }) {
   const queryClient = useQueryClient();
@@ -41,6 +42,8 @@ export default function UI({ initialCourse }: { initialCourse: Course }) {
   const [sectionTitles, setSectionTitles] = useState<Record<string, string>>(
     {}
   );
+  const [editLecture, setEditLecture] = useState<Lecture | null>(null);
+  const [isEditLectureDialogOpen, setIsEditLectureDialogOpen] = useState(false);
   // 강의별 임시 제목 상태
   const [lectureTitles, setLectureTitles] = useState<Record<string, string>>(
     {}
@@ -237,19 +240,21 @@ export default function UI({ initialCourse }: { initialCourse: Course }) {
   };
 
   // 수정 버튼 클릭 핸들러
-  const handleEditLecture = (lectureId: string) => {
-    const isEditable = lectureEditable[lectureId] ?? true; // 기본값은 수정 가능
+  const handleEditLecture = (lecture: Lecture) => {
+    const isEditable = lectureEditable[lecture.id] ?? true; // 기본값은 수정 가능
     
     if (!isEditable) {
       toast.error("강의가 잠겨있어 수정할 수 없습니다.");
       return;
     }
     
-    // 수정 모드 토글
-    setLectureEditMode((prev) => ({
-      ...prev,
-      [lectureId]: !prev[lectureId],
-    }));
+    setEditLecture(lecture);
+    setIsEditLectureDialogOpen(true);
+  };
+
+  const handleCloseEditLectureDialog = () => {
+    setIsEditLectureDialogOpen(false);
+    setEditLecture(null);
   };
 
   // 공개 토글 mutation
@@ -427,7 +432,7 @@ return (
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => handleEditLecture(lecture.id)}
+                    onClick={() => handleEditLecture(lecture)}
                     aria-label="강의 제목 수정"
                     className="h-8 w-8 md:h-10 md:w-10"
                   >
@@ -521,6 +526,14 @@ return (
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {editLecture && (
+        <EditLectureDialog
+          isOpen={isEditLectureDialogOpen}
+          onClose={handleCloseEditLectureDialog}
+          lecture={editLecture}
+        />
+      )}
     </div>
   );
 }

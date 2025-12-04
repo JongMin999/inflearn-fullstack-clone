@@ -10,10 +10,12 @@ import {
   lecturesControllerCreate,
   lecturesControllerDelete,
   lecturesControllerUpdate,
+  mediaControllerUploadMedia,
   sectionsControllerCreate,
   sectionsControllerDelete,
   sectionsControllerUpdate,
   UpdateCourseDto,
+  UpdateLectureDto,
 } from "@/generated/openapi-client";
 
 export const getAllCategories = async () => {
@@ -164,6 +166,30 @@ export const updateLectureTitle = async (lectureId: string, title: string) => {
     },
     body: {
       title,
+    },
+  });
+
+  return { data, error };
+};
+
+export const updateLecture = async (
+  lectureId: string,
+  updateLectureDto: UpdateLectureDto
+) => {
+  const { data, error } = await lecturesControllerUpdate({
+    path: {
+      lectureId,
+    },
+    body: updateLectureDto,
+  });
+
+  return { data, error };
+};
+
+export const uploadMedia = async (file: File) => {
+  const { data, error } = await mediaControllerUploadMedia({
+    body: {
+      file,
     },
   });
 
