@@ -59,6 +59,7 @@ export default function UI() {
         <Button 
           variant={"outline"} 
           className="px-4 md:px-6 lg:px-8 py-3 md:py-4 lg:py-6 text-xs md:text-sm lg:text-base font-bold whitespace-nowrap"
+          onClick={() => router.back()}
         >
           이전
         </Button>
