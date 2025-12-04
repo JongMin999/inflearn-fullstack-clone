@@ -3,6 +3,7 @@
 import {
   categoriesControllerFindAll,
   coursesControllerCreate,
+  coursesControllerDelete,
   coursesControllerFindAll,
   coursesControllerFindOne,
   coursesControllerUpdate,
@@ -82,6 +83,16 @@ export const updateCourse = async (
       id,
     },
     body: updateCourseDto,
+  });
+
+  return { data, error };
+};
+
+export const deleteCourse = async (id: string) => {
+  const { data, error } = await coursesControllerDelete({
+    path: {
+      id,
+    },
   });
 
   return { data, error };
