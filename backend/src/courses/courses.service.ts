@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Course, Prisma } from '@prisma/client';
@@ -94,6 +95,28 @@ export class CoursesService {
     }
 
     const { categoryIds, ...otherData } = updateCourseDto;
+
+    // 가격/할인 가격 유효성 검사 (PostgreSQL INT4 한계 값 보호)
+    const MAX_INT_32 = 2_147_483_647;
+
+    if (
+      typeof otherData.price === 'number' &&
+      otherData.price > MAX_INT_32
+    ) {
+      throw new BadRequestException(
+        `가격은 ${MAX_INT_32.toLocaleString()} 이하의 값만 입력할 수 있습니다.`,
+      );
+    }
+
+    if (
+      typeof otherData.discountPrice === 'number' &&
+      otherData.discountPrice > MAX_INT_32
+    ) {
+      throw new BadRequestException(
+        `할인 가격은 ${MAX_INT_32.toLocaleString()} 이하의 값만 입력할 수 있습니다.`,
+      );
+    }
+
     let data: Prisma.CourseUpdateInput = {
       ...otherData,
     };

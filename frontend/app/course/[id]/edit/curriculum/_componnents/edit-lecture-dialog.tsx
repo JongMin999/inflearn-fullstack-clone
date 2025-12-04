@@ -94,7 +94,10 @@ export function EditLectureDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    editLectureMutation.mutate(form);
+    editLectureMutation.mutate({
+      ...form,
+      title: form.title.slice(0, 200),
+    });
   };
 
   return (
@@ -109,8 +112,12 @@ export function EditLectureDialog({
             <Input
               id="title"
               value={form.title}
+              maxLength={200}
               onChange={(e) =>
-                setForm((prev) => ({ ...prev, title: e.target.value }))
+                setForm((prev) => ({
+                  ...prev,
+                  title: e.target.value.slice(0, 200),
+                }))
               }
             />
           </div>
