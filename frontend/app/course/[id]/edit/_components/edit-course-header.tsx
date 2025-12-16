@@ -17,6 +17,7 @@ export default function EditCourseHeader({ course }: EditCourseHeaderProps) {
   const queryClient = useQueryClient();
   const router = useRouter();
   const [isSubmitDialogOpen, setIsSubmitDialogOpen] = useState(false);
+  const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
@@ -35,7 +36,6 @@ export default function EditCourseHeader({ course }: EditCourseHeaderProps) {
         status: "PUBLISHED",
       }),
     onSuccess: (res) => {
-      toast.success("강의가 성공적으로 게시되었습니다.");
       // sessionStorage 초기화
       if (typeof window !== "undefined") {
         const dirtyKey = `course-edit-dirty-${course.id}`;
@@ -43,6 +43,7 @@ export default function EditCourseHeader({ course }: EditCourseHeaderProps) {
       }
       setIsSubmitDialogOpen(false);
       setIsSubmitted(true);
+      setIsSuccessDialogOpen(true);
       router.refresh();
       queryClient.invalidateQueries({
         queryKey: ["course", course.id],
@@ -64,6 +65,11 @@ export default function EditCourseHeader({ course }: EditCourseHeaderProps) {
 
   const handleSubmitDismiss = () => {
     setIsSubmitDialogOpen(false);
+  };
+
+  const handleSuccessConfirm = () => {
+    setIsSuccessDialogOpen(false);
+    router.push("/instructor/courses");
   };
 
   return (
@@ -114,6 +120,19 @@ export default function EditCourseHeader({ course }: EditCourseHeaderProps) {
                 onClick={handleSubmitDismiss}
               >
                 취소
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isSuccessDialogOpen && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg w-[90%] max-w-sm p-6 space-y-4 text-center">
+            <p className="text-base font-semibold">제출되었습니다.</p>
+            <div className="flex items-center justify-center gap-3">
+              <Button className="flex-1" onClick={handleSuccessConfirm}>
+                확인
               </Button>
             </div>
           </div>
