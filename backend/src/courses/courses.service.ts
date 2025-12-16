@@ -43,7 +43,7 @@ export class CoursesService {
     return this.prisma.course.create({
       data: {
         title: createCourseDto.title,
-        slug,
+        slug: slugify(createCourseDto.title),
         instructorId: userId,
         status: 'DRAGT',
       },
