@@ -19,6 +19,8 @@ import { CreateCourseDto } from './dto/create-course.dto';
 import { Prisma, Course } from '@prisma/client';
 import { UpdateCourseDto } from './dto/update-course.dto';
 import { Course as CourseEntity } from 'src/_gen/prisma-class/course';
+import { SearchCourseResponseDto } from './dto/search-response.dto';
+import { SearchCourseDto } from './dto/search-course.dto';
 
 @ApiTags('코스')
 @Controller('courses')
@@ -160,4 +162,12 @@ export class CoursesController {
   delete(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     return this.coursesService.delete(id, req.user.sub);
   }
+  @Post('search')
+@ApiOkResponse({
+  description: '코스 검색',
+  type: SearchCourseResponseDto,
+})
+search(@Body() searchCourseDto: SearchCourseDto) {
+  return this.coursesService.searchCourses(searchCourseDto);
+}
 }
