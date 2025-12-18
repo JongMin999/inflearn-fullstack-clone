@@ -163,18 +163,54 @@ export class CoursesService {
   ): Promise<SearchCourseResponseDto> {
     const { q, category, priceRange, sortBy, order, page, pageSize } =
       searchCourseDto;
-  
+
     const where: Prisma.CourseWhereInput = {};
-  
+
     // 키워드 검색 (강의명, 강사명에서 부분 일치)
     if (q) {
-      where.OR = [
+      // 공백을 제거한 검색어 (예: "앱 개발" -> "앱개발")
+      const normalized = q.replace(/\s+/g, '');
+
+      // "앱개발" -> ["앱 개발", ...] 처럼, 문자 사이에 공백을 하나 넣은 변형들을 생성
+      const spacedVariants: string[] = [];
+      if (normalized.length > 1) {
+        for (let i = 1; i < normalized.length; i++) {
+          spacedVariants.push(
+            normalized.slice(0, i) + ' ' + normalized.slice(i),
+          );
+        }
+      }
+
+      // title 조건들 (공백 포함/미포함, 변형 포함)
+      const titleConditions: Prisma.CourseWhereInput[] = [
         {
           title: {
             contains: q,
             mode: 'insensitive',
           },
         },
+      ];
+
+      if (normalized !== q) {
+        titleConditions.push({
+          title: {
+            contains: normalized,
+            mode: 'insensitive',
+          },
+        });
+      }
+
+      spacedVariants.forEach((variant) => {
+        titleConditions.push({
+          title: {
+            contains: variant,
+            mode: 'insensitive',
+          },
+        });
+      });
+
+      // instructor.name 조건들 (동일한 패턴 적용)
+      const instructorConditions: Prisma.CourseWhereInput[] = [
         {
           instructor: {
             name: {
@@ -184,17 +220,41 @@ export class CoursesService {
           },
         },
       ];
+
+      if (normalized !== q) {
+        instructorConditions.push({
+          instructor: {
+            name: {
+              contains: normalized,
+              mode: 'insensitive',
+            },
+          },
+        });
+      }
+
+      spacedVariants.forEach((variant) => {
+        instructorConditions.push({
+          instructor: {
+            name: {
+              contains: variant,
+              mode: 'insensitive',
+            },
+          },
+        });
+      });
+
+      where.OR = [...titleConditions, ...instructorConditions];
     }
-  
+
     // 카테고리 필터
     if (category) {
       where.categories = {
         some: {
-          id: category,
+          slug: category,
         },
       };
     }
-  
+
     // 가격 범위 필터
     if (priceRange) {
       const priceConditions: any = {};
@@ -208,17 +268,17 @@ export class CoursesService {
         where.price = priceConditions;
       }
     }
-  
+
     // 정렬 조건
     const orderBy: Prisma.CourseOrderByWithRelationInput = {};
     if (sortBy === 'price') {
       orderBy.price = order as 'asc' | 'desc';
     }
-  
+
     // 페이지네이션 계산
     const skip = (page - 1) * pageSize;
     const totalItems = await this.prisma.course.count({ where });
-  
+
     // 강의 목록 조회
     const courses = await this.prisma.course.findMany({
       where,
@@ -241,23 +301,20 @@ export class CoursesService {
         },
       },
     });
-  
+
     // 페이지네이션 정보 계산
     const totalPages = Math.ceil(totalItems / pageSize);
     const hasNext = page < totalPages;
     const hasPrev = page > 1;
-  
+
     return {
-      success: true,
-      data: {
-        courses: courses as any[],
-        pagination: {
-          currentPage: page,
-          totalPages,
-          totalItems,
-          hasNext,
-          hasPrev,
-        },
+      courses: courses as any[],
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalItems,
+        hasNext,
+        hasPrev,
       },
     };
   }
