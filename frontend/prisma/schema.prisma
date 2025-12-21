@@ -122,6 +122,7 @@ model Lecture {
   order            Int
   duration         Int?
   isPreview        Boolean  @default(false) @map("is_preview")
+  isEditable       Boolean  @default(true) @map("is_editable")
   sectionId        String   @map("section_id")
   courseId         String   @map("course_id")
   videoStorageInfo Json?    @map("video_storage_info")

@@ -76,6 +76,21 @@ export default function UI({ initialCourse }: { initialCourse: Course }) {
     },
   });
 
+  // course 데이터에서 lecture의 isEditable 값을 초기 상태로 설정
+  useEffect(() => {
+    if (course?.sections) {
+      const initialEditable: Record<string, boolean> = {};
+      course.sections.forEach((section) => {
+        section.lectures?.forEach((lecture) => {
+          // lecture.isEditable이 있으면 사용, 없으면 true (기본값)
+          // 타입 안전성을 위해 'isEditable' in lecture 체크
+          initialEditable[lecture.id] = ('isEditable' in lecture && lecture.isEditable === false) ? false : true;
+        });
+      });
+      setLectureEditable(initialEditable);
+    }
+  }, [course]);
+
   // 섹션 추가
   const addSectionMutation = useMutation({
     mutationFn: async (title: string) => {
@@ -201,6 +216,31 @@ export default function UI({ initialCourse }: { initialCourse: Course }) {
     },
   });
 
+  // 강의 잠금 상태 수정 mutation
+  const updateLectureEditableMutation = useMutation({
+    mutationFn: async ({
+      lectureId,
+      isEditable,
+    }: {
+      lectureId: string;
+      isEditable: boolean;
+    }) => {
+      const { data, error } = await api.updateLecture(lectureId, {
+        isEditable,
+      });
+
+      if (error) {
+        toast.error(error as string);
+        return null;
+      }
+
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["course", initialCourse.id] });
+    },
+  });
+
   // UI 핸들러
   const handleAddSection = () => {
     const title = (addSectionTitle.trim() || "섹션 제목을 작성해주세요").slice(
@@ -250,17 +290,30 @@ export default function UI({ initialCourse }: { initialCourse: Course }) {
 
   // 자물쇠 토글 (수정 가능/불가능)
   const handleToggleLock = (lectureId: string) => {
-    setLectureEditable((prev) => ({
-      ...prev,
-      [lectureId]: !prev[lectureId],
-    }));
-    // 자물쇠가 잠기면 수정 모드도 해제
-    if (lectureEditable[lectureId]) {
-      setLectureEditMode((prev) => ({
+    setLectureEditable((prev) => {
+      // 기본값은 true (수정 가능), undefined일 때도 true로 간주
+      const currentValue = prev[lectureId] ?? true;
+      const newValue = !currentValue;
+      
+      // 자물쇠가 잠기면 수정 모드도 해제
+      if (currentValue) {
+        setLectureEditMode((prevMode) => ({
+          ...prevMode,
+          [lectureId]: false,
+        }));
+      }
+      
+      // API로 잠금 상태 저장
+      updateLectureEditableMutation.mutate({
+        lectureId,
+        isEditable: newValue,
+      });
+      
+      return {
         ...prev,
-        [lectureId]: false,
-      }));
-    }
+        [lectureId]: newValue,
+      };
+    });
   };
 
   // 수정 버튼 클릭 핸들러
@@ -303,6 +356,11 @@ export default function UI({ initialCourse }: { initialCourse: Course }) {
 
   // 공개 토글 핸들러
   const handleTogglePublic = (lecture: Lecture) => {
+    const isEditable = lectureEditable[lecture.id] ?? true; // 기본값은 수정 가능
+    if (!isEditable) {
+      toast.error("강의가 잠겨있어 공개 설정을 변경할 수 없습니다.");
+      return;
+    }
     toggleLecturePreviewMutation.mutate(lecture);
   };
 
@@ -480,10 +538,15 @@ return (
                       onCheckedChange={() => {
                         handleTogglePublic(lecture);
                       }}
+                      disabled={!(lectureEditable[lecture.id] ?? true)}
                       aria-label="공개/비공개"
                       className="scale-75 md:scale-100"
                     />
-                    <span className="text-xs text-gray-600 whitespace-nowrap hidden sm:inline">
+                    <span className={`text-xs whitespace-nowrap hidden sm:inline ${
+                      lectureEditable[lecture.id] ?? true
+                        ? "text-gray-600"
+                        : "text-gray-300"
+                    }`}>
                       공개
                     </span>
                   </div>

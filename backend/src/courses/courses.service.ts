@@ -72,10 +72,66 @@ export class CoursesService {
   }
 
   async findOne(id: string): Promise<CourseDetailDto | null> {
+    type CourseWithRelations = Prisma.CourseGetPayload<{
+      include: {
+        instructor: {
+          include: {
+            _count: {
+              select: {
+                courses: true;
+              };
+            };
+          };
+        };
+        categories: true;
+        reviews: {
+          include: {
+            user: {
+              select: {
+                id: true;
+                name: true;
+                image: true;
+              };
+            };
+          };
+        };
+        enrollments: true;
+        sections: {
+          include: {
+            lectures: {
+              select: {
+                id: true;
+                title: true;
+                isPreview: true;
+                isEditable: true;
+                duration: true;
+                order: true;
+              };
+            };
+          };
+        };
+        _count: {
+          select: {
+            lectures: true;
+            enrollments: true;
+            reviews: true;
+          };
+        };
+      };
+    }>;
+
     const course = await this.prisma.course.findUnique({
       where: { id },
       include: {
-        instructor: true,
+        instructor: {
+          include: {
+            _count: {
+              select: {
+                courses: true,
+              },
+            },
+          },
+        },
         categories: true,
         reviews: {
           include: {
@@ -99,9 +155,10 @@ export class CoursesService {
                 id: true,
                 title: true,
                 isPreview: true,
+                isEditable: true,
                 duration: true,
                 order: true,
-              },
+              } as any,
               orderBy: {
                 order: 'asc',
               },
@@ -119,7 +176,7 @@ export class CoursesService {
           },
         },
       },
-    });
+    }) as CourseWithRelations | null;
 
     if (!course) {
       return null;
@@ -147,6 +204,7 @@ export class CoursesService {
       totalReviews: course._count.reviews,
       totalLectures: course._count.lectures,
       totalDuration,
+      instructorCourseCount: course.instructor._count.courses,
     };
 
     return result as unknown as CourseDetailDto;

@@ -32,6 +32,14 @@ export class UpdateLectureDto extends PartialType(CreateLectureDto) {
   @IsOptional()
   isPreview?: boolean;
 
+  @ApiProperty({
+    description: '개별 강의 수정 가능 여부',
+    required: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  isEditable?: boolean;
+
   @ApiProperty({ description: '개별 강의 비디오 업로드 정보', required: false })
   @IsObject()
   @IsOptional()
