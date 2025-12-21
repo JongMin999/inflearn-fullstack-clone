@@ -1,7 +1,7 @@
 "use client";
 
 import { CourseCategory, User } from "@/generated/openapi-client";
-import { Layers, Search } from "lucide-react";
+import { Layers, Search, Grid } from "lucide-react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,8 @@ export default function SiteHeader({
   categories: CourseCategory[];
 }) {
   const pathname = usePathname();
-  const isSiteHeaderNeeded = !pathname.includes("/course/");
+  // 강의 수정 페이지(/course/[id]/edit)에서만 헤더 숨김, 일반 강의 상세페이지는 표시
+  const isSiteHeaderNeeded = !(pathname.includes("/course/") && pathname.includes("/edit"));
   const isCategoryNeeded = pathname == "/" || pathname.includes("/courses");
   const [search, setSearch] = useState("");
   const router = useRouter();
@@ -167,7 +168,14 @@ export default function SiteHeader({
       {/* 하단 카테고리 */}
       <div className="header-bottom bg-white px-8">
         {isCategoryNeeded && (
-           <nav className="category-nav flex justify-between gap-6 py-4 overflow-x-auto scrollbar-none">
+           <nav className="category-nav flex justify-start gap-6 py-4 overflow-x-auto xl:overflow-x-visible scrollbar-none">
+            {/* 전체 카테고리 */}
+            <Link href="/courses">
+              <div className="category-item flex flex-col items-center min-w-[72px] text-gray-700 hover:text-[#1dc078] cursor-pointer transition-colors">
+                <Grid size={28} className="mb-1" />
+                <span className="text-xs font-medium whitespace-nowrap">전체</span>
+              </div>
+            </Link>
             {categories.map((category) => (
               <Link key={category.id} href={`/courses/${category.slug}`}>
                 <div className="category-item flex flex-col items-center min-w-[72px] text-gray-700 hover:text-[#1dc078] cursor-pointer transition-colors">
