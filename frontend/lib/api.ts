@@ -41,13 +41,10 @@ export const getAllInstructorCourses = async () => {
     error,
   };
 };
-export const getCourseById = async (id: string, include?: string) => {
+export const getCourseById = async (id: string) => {
   const { data, error } = await coursesControllerFindOne({
     path: {
       id,
-    },
-    query: {
-      include: include ?? "sections,lectures",
     },
   });
 
