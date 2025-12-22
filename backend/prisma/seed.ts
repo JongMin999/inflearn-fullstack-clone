@@ -437,15 +437,16 @@ async function main() {
       discountPrice: 58000,
       categorySlug: 'it-programming',
     },
-  ].map((course) => ({
+  ].map((course, index) => ({
     ...course,
     slug: slugify(course.title),
     level: generateRandomLevel(),
     status: 'PUBLISHED',
     instructorId: userId,
     thumbnailUrl: generateRandomThumbnailUrl(),
-    createdAt: now,
-    updatedAt: now,
+    // 각 강의에 순차적인 createdAt 부여 (최신 강의가 먼저 오도록)
+    createdAt: new Date(now.getTime() - index * 1000), // 각 강의마다 1초씩 차이
+    updatedAt: new Date(now.getTime() - index * 1000),
   }));
 
   // 3. 강의 데이터 및 카테고리 연결

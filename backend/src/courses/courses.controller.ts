@@ -94,6 +94,30 @@ export class CoursesController {
     });
   }
 
+  @Get('instructor/my')
+  @UseGuards(AccessTokenGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOkResponse({
+    description: '강사 본인의 코스 목록',
+    type: CourseEntity,
+    isArray: true,
+  })
+  findMyCourses(@Req() req: Request) {
+    return this.coursesService.findAll({
+      where: {
+        instructorId: req.user.sub,
+      },
+      orderBy: [
+        {
+          createdAt: 'desc',
+        },
+        {
+          id: 'desc',
+        },
+      ],
+    });
+  }
+
   @Get(':id')
   
   @ApiOkResponse({
