@@ -14,8 +14,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Button } from "@/components/ui/button";
-import { Course } from "@/generated/openapi-client";
-import { useMutation } from "@tanstack/react-query";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Course, CourseCategory } from "@/generated/openapi-client";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import * as api from "@/lib/api";
 import { toast } from "sonner";
 
@@ -26,9 +27,23 @@ type FormValues = {
   discountPrice: string;
   level: "BEGINNER" | "INTERMEDIATE" | "ADVANCED";
   status: "PUBLISHED" | "DRAFT";
+  categoryIds: string[];
 };
 
 export default function EditCourseInfoUI({ course }: { course: Course }) {
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(
+    course.categories?.map((cat) => cat.id) ?? []
+  );
+
+  // 카테고리 목록 가져오기
+  const { data: categoriesData } = useQuery({
+    queryKey: ["categories"],
+    queryFn: async () => {
+      const { data } = await api.getAllCategories();
+      return data ?? [];
+    },
+  });
+
   const form = useForm<FormValues>({
     defaultValues: {
       title: course.title,
@@ -39,6 +54,7 @@ export default function EditCourseInfoUI({ course }: { course: Course }) {
         (course.level as "BEGINNER" | "INTERMEDIATE" | "ADVANCED") ??
         "BEGINNER",
       status: (course.status as "PUBLISHED" | "DRAFT") ?? "DRAFT",
+      categoryIds: course.categories?.map((cat) => cat.id) ?? [],
     },
   });
 
@@ -61,12 +77,15 @@ export default function EditCourseInfoUI({ course }: { course: Course }) {
   // 폼 값 변경 감지
   const watchedValues = watch();
   useEffect(() => {
-    if (!formState.isDirty) return;
+    if (!formState.isDirty && selectedCategories.length === (course.categories?.length ?? 0) && 
+        selectedCategories.every(id => course.categories?.some(cat => cat.id === id))) {
+      return;
+    }
     setHasUnsavedChanges(true);
     if (typeof window !== "undefined") {
       window.sessionStorage.setItem(dirtyKey, "1");
     }
-  }, [watchedValues, formState.isDirty, dirtyKey]);
+  }, [watchedValues, formState.isDirty, selectedCategories, course.categories, dirtyKey]);
 
   const updateCourseMutation = useMutation({
     mutationFn: async (data: FormValues) => {
@@ -79,6 +98,7 @@ export default function EditCourseInfoUI({ course }: { course: Course }) {
         ...sanitizedData,
         price: parseInt(sanitizedData.price),
         discountPrice: parseInt(sanitizedData.discountPrice),
+        categoryIds: selectedCategories,
       });
 
       if (error) {
@@ -300,7 +320,52 @@ export default function EditCourseInfoUI({ course }: { course: Course }) {
           )}
         />
 
-        <Button type="submit" className="w-full mt-4 md:mt-6 text-sm md:text-base py-2 md:py-3">
+        <FormItem className="min-w-0">
+          <FormLabel className="text-sm md:text-base whitespace-nowrap">
+            카테고리 <span className="text-red-500">*</span>
+          </FormLabel>
+          <div className="text-xs md:text-sm text-gray-500 mb-2 break-words whitespace-normal min-w-0">
+            강의가 속할 카테고리를 선택해주세요. (최소 1개 이상 선택)
+          </div>
+          <div className="space-y-2 max-h-60 overflow-y-auto border rounded-md p-4">
+            {categoriesData && categoriesData.length > 0 ? (
+              categoriesData.map((category: CourseCategory) => (
+                <div key={category.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`category-${category.id}`}
+                    checked={selectedCategories.includes(category.id)}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setSelectedCategories([...selectedCategories, category.id]);
+                      } else {
+                        setSelectedCategories(
+                          selectedCategories.filter((id) => id !== category.id)
+                        );
+                      }
+                    }}
+                  />
+                  <label
+                    htmlFor={`category-${category.id}`}
+                    className="text-sm md:text-base font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    {category.name}
+                  </label>
+                </div>
+              ))
+            ) : (
+              <div className="text-sm text-gray-500">카테고리를 불러오는 중...</div>
+            )}
+          </div>
+          {selectedCategories.length === 0 && (
+            <p className="text-xs text-red-500 mt-1">최소 1개 이상의 카테고리를 선택해주세요.</p>
+          )}
+        </FormItem>
+
+        <Button 
+          type="submit" 
+          className="w-full mt-4 md:mt-6 text-sm md:text-base py-2 md:py-3"
+          disabled={selectedCategories.length === 0}
+        >
           저장하기
         </Button>
       </form>

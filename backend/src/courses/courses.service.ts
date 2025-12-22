@@ -43,13 +43,27 @@ export class CoursesService {
       counter++;
     }
 
-    return this.prisma.course.create({
-      data: {
-        title: createCourseDto.title,
-        slug: slugify(createCourseDto.title),
-        instructorId: userId,
-        status: 'DRAGT',
+    const { categoryIds, slug: _, isPublished, ...courseData } = createCourseDto;
+
+    const data: Prisma.CourseCreateInput = {
+      title: createCourseDto.title,
+      slug,
+      instructor: {
+        connect: { id: userId },
       },
+      status: 'DRAGT',
+      ...courseData,
+    };
+
+    // 카테고리 연결
+    if (categoryIds && categoryIds.length > 0) {
+      data.categories = {
+        connect: categoryIds.map((id) => ({ id })),
+      };
+    }
+
+    return this.prisma.course.create({
+      data,
     });
   }
 
@@ -58,7 +72,7 @@ export class CoursesService {
     take?: number;
     cursor?: Prisma.CourseWhereUniqueInput;
     where?: Prisma.CourseWhereInput;
-    orderBy?: Prisma.CourseOrderByWithRelationInput;
+    orderBy?: Prisma.CourseOrderByWithRelationInput | Prisma.CourseOrderByWithRelationInput[];
   }): Promise<Course[]> {
     const { skip, take, cursor, where, orderBy } = params;
 
@@ -246,6 +260,7 @@ export class CoursesService {
       );
     }
 
+    // createdAt은 절대 변경되지 않도록 명시적으로 제외
     let data: Prisma.CourseUpdateInput = {
       ...otherData,
     };
@@ -254,9 +269,10 @@ export class CoursesService {
       throw new UnauthorizedException('강의의 소유자만 수정할 수 있습니다.');
     }
 
-    if (categoryIds && categoryIds.length > 0) {
+    // 카테고리 업데이트: 기존 카테고리를 제거하고 새로운 카테고리로 교체
+    if (categoryIds !== undefined) {
       data.categories = {
-        connect: categoryIds.map((id) => ({ id })),
+        set: categoryIds.map((id) => ({ id })),
       };
     }
 
