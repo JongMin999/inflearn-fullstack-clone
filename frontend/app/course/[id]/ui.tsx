@@ -41,7 +41,8 @@ import { useRouter } from "next/navigation";
 /*****************
  * Helper Utils  *
  *****************/
-function formatSecondsToMinSec(seconds: number) {
+function formatSecondsToMinSec(seconds: number | undefined) {
+  if (!seconds) return "00:00";
   const mins = Math.floor(seconds / 60)
     .toString()
     .padStart(2, "0");
@@ -251,7 +252,7 @@ function LectureRow({
             미리보기
           </button>
         )}
-        <span>{formatSecondsToMinSec(lecture.duration ?? 0)}</span>
+        <span>{formatSecondsToMinSec(lecture.duration)}</span>
       </div>
     </div>
   );

@@ -6,6 +6,11 @@ export class UpdateLectureActivityDto {
   @IsNotEmpty()
   @IsNumber()
   progress: number;
+  
+  @ApiProperty({ description: '강의 재생 시간' })
+  @IsNotEmpty()
+  @IsNumber()
+  duration: number;
 
   @ApiProperty({ description: '강의 완료 여부' })
   @IsNotEmpty()

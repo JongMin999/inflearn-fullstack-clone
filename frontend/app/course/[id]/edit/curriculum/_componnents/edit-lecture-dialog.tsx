@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -33,6 +33,7 @@ interface EditLectureForm {
   title: string;
   description: string;
   videoStorageInfo?: any;
+  duration?: number;
 }
 
 const MAX_FILE_SIZE = 300 * 1024 * 1024; // 300MB
@@ -53,12 +54,14 @@ export function EditLectureDialog({
   lecture,
 }: EditLectureDialogProps) {
   const queryClient = useQueryClient();
+  const videoRef = useRef<HTMLVideoElement>(null);
   console.log(`lecture: ${JSON.stringify(lecture)}`);
 
   const [form, setForm] = useState<EditLectureForm>({
     title: lecture.title,
     description: lecture.description ?? "<p>강의의 설명을 적어주세요.</p>",
     videoStorageInfo: lecture.videoStorageInfo,
+    duration: lecture.duration ?? undefined,
   });
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
@@ -70,6 +73,24 @@ export function EditLectureDialog({
         return;
       }
       setForm((prev) => ({ ...prev, videoStorageInfo: data }));
+      
+      // 비디오 파일의 duration 추출
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.onloadedmetadata = () => {
+        window.URL.revokeObjectURL(video.src);
+        const duration = Math.floor(video.duration);
+        setForm((prev) => ({ ...prev, duration }));
+      };
+      video.src = URL.createObjectURL(file);
+    }
+  }, []);
+
+  const handleVideoLoadedMetadata = useCallback((e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const video = e.currentTarget;
+    if (video.duration && !isNaN(video.duration)) {
+      const duration = Math.floor(video.duration);
+      setForm((prev) => ({ ...prev, duration }));
     }
   }, []);
 
@@ -83,7 +104,10 @@ export function EditLectureDialog({
   const editLectureMutation = useMutation({
     mutationFn: async (data: EditLectureForm) => {
       return api.updateLecture(lecture.id, {
-        ...form,
+        title: form.title,
+        description: form.description,
+        videoStorageInfo: form.videoStorageInfo,
+        duration: form.duration,
       });
     },
     onSuccess: () => {
@@ -133,9 +157,11 @@ export function EditLectureDialog({
             {form.videoStorageInfo && (
               <div className="w-full h-auto min-h-[200px]">
                 <video
+                  ref={videoRef}
                   autoPlay={true}
                   controls={true}
                   src={form.videoStorageInfo.cloudFront.url}
+                  onLoadedMetadata={handleVideoLoadedMetadata}
                 />
               </div>
             )}
