@@ -1,3 +1,4 @@
+name: inflearn-clone-project
 version: '3.8'
 services:
   postgres:
