@@ -28,8 +28,9 @@ export default function SiteHeader({
   categories: CourseCategory[];
 }) {
   const pathname = usePathname();
-  // 강의 수정 페이지(/course/[id]/edit)에서만 헤더 숨김, 일반 강의 상세페이지는 표시
-  const isSiteHeaderNeeded = !(pathname.includes("/course/") && pathname.includes("/edit"));
+  const isSiteHeaderNeeded = !pathname.match(
+    /^\/course\/[0-9a-f-]+(\/edit|\/edit\/.*)$/
+  );
   const isCategoryNeeded = pathname == "/" || pathname.includes("/courses");
   const [search, setSearch] = useState("");
   const router = useRouter();
