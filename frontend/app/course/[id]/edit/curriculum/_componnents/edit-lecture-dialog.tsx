@@ -53,6 +53,7 @@ export function EditLectureDialog({
   lecture,
 }: EditLectureDialogProps) {
   const queryClient = useQueryClient();
+  console.log(`lecture: ${JSON.stringify(lecture)}`);
 
   const [form, setForm] = useState<EditLectureForm>({
     title: lecture.title,
