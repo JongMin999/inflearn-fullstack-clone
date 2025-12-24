@@ -331,8 +331,26 @@ function VideoPlayer({
           }}
       />
 
+      {/* Center play/pause button */}
+      <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+        <button
+          onClick={handlePlayPause}
+          className={cn(
+            "pointer-events-auto rounded-full bg-black/50 hover:bg-black/70 transition-all duration-200 flex items-center justify-center",
+            playing ? "opacity-0 hover:opacity-100" : "opacity-100"
+          )}
+          aria-label="play-pause"
+        >
+          {playing ? (
+            <PauseIcon className="size-16 md:size-20 text-white" />
+          ) : (
+            <PlayIcon className="size-16 md:size-20 text-white ml-1" />
+          )}
+        </button>
+      </div>
+
       {/* Lecture title overlay */}
-      <div className="absolute top-2 left-2 flex items-center">
+      <div className="absolute top-2 left-2 flex items-center z-10">
         <button className="cursor-pointer" onClick={() => router.back()}>
           <ArrowLeftIcon color="white" size={20} />
         </button>
