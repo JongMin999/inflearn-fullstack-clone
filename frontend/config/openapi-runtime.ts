@@ -14,6 +14,26 @@ export const createClientConfig: CreateClientConfig = (config) => ({
   ...config,
   baseUrl: API_URL,
   async auth() {
-    return getCookie(AUTH_COOKIE_NAME, { cookies });
+    // NextAuth 세션에서 JWT 토큰 생성
+    const { auth } = await import("@/auth");
+    const session = await auth();
+    
+    if (!session?.user?.id) {
+      return undefined;
+    }
+
+    // NextAuth 세션 정보로 JWT 토큰 생성
+    const jwt = await import("jsonwebtoken");
+    const token = jwt.sign(
+      {
+        sub: session.user.id,
+        email: session.user.email,
+        name: session.user.name,
+      },
+      process.env.AUTH_SECRET!,
+      { expiresIn: "1h" }
+    );
+
+    return token;
   },
 });

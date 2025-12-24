@@ -5,8 +5,8 @@ import {
   coursesControllerAddFavorite,
   coursesControllerCreate,
   coursesControllerEnrollCourse,
+  coursesControllerFindAllMyCourses,
   coursesControllerDelete,
-  coursesControllerFindAll,
   coursesControllerSearch,
   coursesControllerFindOne,
   coursesControllerGetFavorite,
@@ -39,44 +39,12 @@ export const getAllCategories = async () => {
 };
 
 export const getAllInstructorCourses = async () => {
-  // 강사별 강의 목록을 가져오기 위해 직접 API 호출
-  // NextAuth 세션에서 JWT 토큰 생성
-  const API_URL = process.env.API_URL || "http://localhost:8000";
-  
-  const { auth } = await import("@/auth");
-  const session = await auth();
-  
-  if (!session?.user?.id) {
-    return { data: null, error: "인증이 필요합니다." };
-  }
+  const { data, error } = await coursesControllerFindAllMyCourses();
 
-  // NextAuth 세션 정보로 JWT 토큰 생성
-  const jwt = await import("jsonwebtoken");
-  const token = jwt.sign(
-    {
-      sub: session.user.id,
-      email: session.user.email,
-      name: session.user.name,
-    },
-    process.env.AUTH_SECRET!,
-    { expiresIn: "1h" }
-  );
-
-  const response = await fetch(`${API_URL}/courses/instructor/my`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: "강의 목록을 가져오는데 실패했습니다." }));
-    return { data: null, error };
-  }
-
-  const data = await response.json();
-  return { data, error: null };
+  return {
+    data,
+    error,
+  };
 };
 export const getCourseById = async (id: string) => {
   const { data, error } = await coursesControllerFindOne({
