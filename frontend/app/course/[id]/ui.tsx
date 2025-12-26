@@ -23,6 +23,7 @@ import {
   Loader2,
   PencilIcon,
   Trash2Icon,
+  XIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -206,16 +207,34 @@ function ReviewModal({
   const isLoading =
     createReviewMutation.isPending || updateReviewMutation.isPending;
 
+  if (!isOpen) return null;
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-center text-lg font-semibold">
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* 오버레이 */}
+      <div
+        className="fixed inset-0 bg-black/50 animate-in fade-in-0"
+        onClick={onClose}
+      />
+      
+      {/* 모달 컨텐츠 */}
+      <div className="relative z-50 w-full max-w-md mx-4 bg-white rounded-lg shadow-lg p-6 animate-in fade-in-0 zoom-in-95">
+        {/* 헤더 */}
+        <div className="mb-6">
+          <h2 className="text-center text-lg font-semibold">
             {editingReview
               ? "수강평 수정하기"
               : "힘이 되는 수강평을 남겨주세요!"}
-          </DialogTitle>
-        </DialogHeader>
+          </h2>
+          {/* 닫기 버튼 */}
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+            aria-label="닫기"
+          >
+            <XIcon className="size-5" />
+          </button>
+        </div>
 
         <div className="space-y-6 py-4">
           <div className="flex justify-center">
@@ -230,7 +249,7 @@ function ReviewModal({
           />
         </div>
 
-        <DialogFooter className="flex gap-2">
+        <div className="flex gap-2 mt-6">
           <button
             onClick={onClose}
             className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
@@ -248,9 +267,9 @@ function ReviewModal({
               <span>{editingReview ? "수정하기" : "저장하기"}</span>
             )}
           </button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </div>
+    </div>
   );
 }
 
