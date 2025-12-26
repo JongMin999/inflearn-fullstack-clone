@@ -67,6 +67,25 @@ export default async function CourseList({
     );
   }
 
+  // 좋아요된 강의를 앞으로 정렬
+  let sortedCourses = [...data.courses];
+  if (session?.user) {
+    const favoritesResult = await api.getMyFavorites();
+    const favoriteCourseIds = new Set(
+      favoritesResult.data?.map((fav) => fav.courseId) || []
+    );
+
+    sortedCourses = sortedCourses.sort((a, b) => {
+      const aIsFavorite = favoriteCourseIds.has(a.id);
+      const bIsFavorite = favoriteCourseIds.has(b.id);
+      
+      // 좋아요된 강의를 앞으로
+      if (aIsFavorite && !bIsFavorite) return -1;
+      if (!aIsFavorite && bIsFavorite) return 1;
+      return 0;
+    });
+  }
+
   const buildPageUrl = (pageNumber: number) => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
@@ -139,7 +158,7 @@ export default async function CourseList({
     <div className="w-full">
       {/* 강의 목록 Grid */}
       <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-        {data.courses.map((course) => (
+        {sortedCourses.map((course) => (
           <CourseCard key={course.id} course={course} user={session?.user} />
         ))}
       </div>

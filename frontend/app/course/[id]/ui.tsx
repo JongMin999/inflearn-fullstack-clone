@@ -27,7 +27,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getLevelText } from "@/lib/level";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as api from "@/lib/api";
 import { User } from "next-auth";
 import { toast } from "sonner";
@@ -770,18 +770,23 @@ function FloatingMenu({
   const [isEnrolled, setIsEnrolled] = useState(course.isEnrolled);
   const [showEnrollSuccessDialog, setShowEnrollSuccessDialog] = useState(false);
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const getFavoriteQuery = useQuery({
     queryKey: ["favorite", course.id],
     queryFn: () => api.getFavorite(course.id),
+    enabled: true, // 항상 활성화
   });
 
   const handleCart = useCallback(() => {
     alert("장바구니 기능은 준비 중입니다.");
   }, []);
-const addFavoriteMutation = useMutation({
+  
+  const addFavoriteMutation = useMutation({
     mutationFn: () => api.addFavorite(course.id),
     onSuccess: () => {
+      // 좋아요 쿼리 즉시 무효화 및 재조회
+      queryClient.invalidateQueries({ queryKey: ["favorite", course.id] });
       getFavoriteQuery.refetch();
     },
   });
@@ -791,6 +796,8 @@ const addFavoriteMutation = useMutation({
       return api.removeFavorite(course.id);
     },
     onSuccess: () => {
+      // 좋아요 쿼리 즉시 무효화 및 재조회
+      queryClient.invalidateQueries({ queryKey: ["favorite", course.id] });
       getFavoriteQuery.refetch();
     },
   });
