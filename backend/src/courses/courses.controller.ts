@@ -5,8 +5,10 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  ParseIntPipe,
   Patch,
   Post,
+  Put,
   Query,
   Req,
   UseGuards,
@@ -35,6 +37,11 @@ import { GetFavoriteResponseDto } from './dto/favorite.dto';
 import { OptionalAccessTokenGuard } from 'src/auth/guards/optional-access-token.guard';
 import { CourseFavorite as CourseFavoriteEntity } from 'src/_gen/prisma-class/course_favorite';
 import { LectureActivity as LectureActivityEntity } from 'src/_gen/prisma-class/lecture_activity';
+import { CourseReview as CourseReviewEntity } from 'src/_gen/prisma-class/course_review';
+import { CreateReviewDto } from './dto/create-review.dto';
+import { UpdateReviewDto } from './dto/update-review.dto';
+import { InstructorReplyDto } from './dto/instructor-reply.dto';
+import { CourseReviewsResponseDto } from './dto/course-reviews-response.dto';
 
 @ApiTags('코스')
 @Controller('courses')
@@ -205,5 +212,111 @@ getMyFavorites(@Req() req: Request) {
   })
   getLectureActivity(@Req() req: Request, @Param('courseId') courseId: string) {
     return this.coursesService.getAllLectureActivities(courseId, req.user.sub);
+  }
+  @Get(':courseId/reviews')
+  @UseGuards(OptionalAccessTokenGuard)
+  @ApiBearerAuth('access-token')
+  @ApiQuery({ name: 'page', required: false, type: Number, description: '페이지 번호', example: 1 })
+  @ApiQuery({ name: 'pageSize', required: false, type: Number, description: '페이지 크기', example: 10 })
+  @ApiQuery({ name: 'sort', required: false, enum: ['latest', 'oldest', 'rating_high', 'rating_low'], description: '정렬 기준', example: 'latest' })
+  @ApiOkResponse({
+    description: '코스 리뷰 조회',
+    type: CourseReviewsResponseDto,
+  })
+  getCourseReviews(
+    @Req() req: Request,
+    @Param('courseId', ParseUUIDPipe) courseId: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('sort') sort?: 'latest' | 'oldest' | 'rating_high' | 'rating_low',
+  ) {
+    return this.coursesService.getCourseReviews(
+      courseId,
+      page ? parseInt(page, 10) : 1,
+      pageSize ? parseInt(pageSize, 10) : 10,
+      sort || 'latest',
+      req.user?.sub,
+    );
+  }
+
+  @Post(':courseId/reviews')
+  @UseGuards(AccessTokenGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOkResponse({
+    description: '수강평 작성',
+    type: CourseReviewEntity,
+  })
+  createReview(
+    @Req() req: Request,
+    @Param('courseId', ParseUUIDPipe) courseId: string,
+    @Body() createReviewDto: CreateReviewDto,
+  ) {
+    return this.coursesService.createReview(
+      courseId,
+      req.user.sub,
+      createReviewDto,
+    );
+  }
+
+  @Put('reviews/:reviewId')
+  @UseGuards(AccessTokenGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOkResponse({
+    description: '수강평 수정',
+    type: CourseReviewEntity,
+  })
+  updateReview(
+    @Req() req: Request,
+    @Param('reviewId', ParseUUIDPipe) reviewId: string,
+    @Body() updateReviewDto: UpdateReviewDto,
+  ) {
+    return this.coursesService.updateReview(
+      reviewId,
+      req.user.sub,
+      updateReviewDto,
+    );
+  }
+
+  @Delete('reviews/:reviewId')
+  @UseGuards(AccessTokenGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOkResponse({
+    description: '수강평 삭제',
+  })
+  deleteReview(
+    @Req() req: Request,
+    @Param('reviewId', ParseUUIDPipe) reviewId: string,
+  ) {
+    return this.coursesService.deleteReview(reviewId, req.user.sub);
+  }
+
+  @Put('reviews/:reviewId/instructor-reply')
+  @UseGuards(AccessTokenGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOkResponse({
+    description: '강사 답변 작성/수정',
+    type: CourseReviewEntity,
+  })
+  createInstructorReply(
+    @Req() req: Request,
+    @Param('reviewId', ParseUUIDPipe) reviewId: string,
+    @Body() instructorReplyDto: InstructorReplyDto,
+  ) {
+    return this.coursesService.createInstructorReply(
+      reviewId,
+      req.user.sub,
+      instructorReplyDto,
+    );
+  }
+  @Get('reviews/instructor')
+  @UseGuards(AccessTokenGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOkResponse({
+    description: '강사의 모든 강의의 리뷰 조회',
+    type: CourseReviewEntity,
+    isArray: true,
+  })
+  getInstructorReviews(@Req() req: Request) {
+    return this.coursesService.getInstructorReviews(req.user.sub);
   }
 }

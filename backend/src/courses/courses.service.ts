@@ -14,6 +14,11 @@ import { SearchCourseResponseDto } from './dto/search-response.dto';
 import { CourseDetailDto } from './dto/course-detail.dto';
 import { GetFavoriteResponseDto } from './dto/favorite.dto';
 import { CourseFavorite as CourseFavoriteEntity } from 'src/_gen/prisma-class/course_favorite';
+import { CreateReviewDto } from './dto/create-review.dto';
+import { CourseReview as CourseReviewEntity } from 'src/_gen/prisma-class/course_review';
+import { UpdateReviewDto } from './dto/update-review.dto';
+import { InstructorReplyDto } from './dto/instructor-reply.dto';
+import { CourseReviewsResponseDto } from './dto/course-reviews-response.dto';
 import slugify from 'slugify';
 
 @Injectable()
@@ -46,7 +51,7 @@ export class CoursesService {
       counter++;
     }
 
-    const { categoryIds, slug: _, isPublished, ...courseData } = createCourseDto;
+    const { categoryIds, slug: _, ...courseData } = createCourseDto;
 
     const data: Prisma.CourseCreateInput = {
       title: createCourseDto.title,
@@ -79,12 +84,43 @@ export class CoursesService {
   }): Promise<Course[]> {
     const { skip, take, cursor, where, orderBy } = params;
 
-    return this.prisma.course.findMany({
+    const courses = await this.prisma.course.findMany({
       skip,
       take,
       cursor,
       where,
       orderBy,
+      include: {
+        reviews: {
+          select: {
+            rating: true,
+          },
+        },
+        _count: {
+          select: {
+            reviews: true,
+          },
+        },
+      },
+    });
+
+    // averageRating과 totalReviews 계산
+    return courses.map((course) => {
+      const averageRating =
+        course.reviews.length > 0
+          ? Math.round(
+              (course.reviews.reduce((sum, review) => sum + review.rating, 0) /
+                course.reviews.length) *
+                10
+            ) / 10
+          : 0;
+      const totalReviews = course._count.reviews;
+
+      return {
+        ...course,
+        averageRating,
+        totalReviews,
+      } as any;
     });
   }
 
@@ -239,6 +275,43 @@ export class CoursesService {
       }),
     );
 
+    // 지식공유자 통계 계산
+    const instructorId = course.instructorId;
+    
+    // 해당 강사의 모든 강의에 등록된 총 수강생 수 (중복 제거)
+    const uniqueStudents = await this.prisma.courseEnrollment.findMany({
+      where: {
+        course: {
+          instructorId,
+        },
+      },
+      select: {
+        userId: true,
+      },
+    });
+    const totalStudents = new Set(uniqueStudents.map((e) => e.userId)).size;
+
+    // 해당 강사의 모든 강의에 대한 총 수강평 수
+    const totalInstructorReviews = await this.prisma.courseReview.count({
+      where: {
+        course: {
+          instructorId,
+        },
+      },
+    });
+
+    // 해당 강사가 작성한 답변 수
+    const totalInstructorAnswers = await this.prisma.courseReview.count({
+      where: {
+        course: {
+          instructorId,
+        },
+        instructorReply: {
+          not: null,
+        },
+      },
+    });
+
     const result = {
       ...course,
       sections: sectionsWithFilteredVideoStorageInfo,
@@ -249,6 +322,12 @@ export class CoursesService {
       totalLectures: course._count.lectures,
       totalDuration,
       instructorCourseCount: course.instructor._count.courses,
+      instructorStats: {
+        totalStudents,
+        totalReviews: totalInstructorReviews,
+        totalAnswers: totalInstructorAnswers,
+        totalCourses: course.instructor._count.courses,
+      },
     };
 
     return result as unknown as CourseDetailDto;
@@ -466,6 +545,11 @@ export class CoursesService {
           },
         },
         categories: true,
+        reviews: {
+          select: {
+            rating: true,
+          },
+        },
         _count: {
           select: {
             enrollments: true,
@@ -475,13 +559,32 @@ export class CoursesService {
       },
     });
 
+    // averageRating과 totalReviews 계산
+    const coursesWithStats = courses.map((course) => {
+      const averageRating =
+        course.reviews.length > 0
+          ? Math.round(
+              (course.reviews.reduce((sum, review) => sum + review.rating, 0) /
+                course.reviews.length) *
+                10
+            ) / 10
+          : 0;
+      const totalReviews = course._count.reviews;
+
+      return {
+        ...course,
+        averageRating,
+        totalReviews,
+      } as any;
+    });
+
     // 페이지네이션 정보 계산
     const totalPages = Math.ceil(totalItems / pageSize);
     const hasNext = page < totalPages;
     const hasPrev = page > 1;
 
     return {
-      courses: courses as any[],
+      courses: coursesWithStats,
       pagination: {
         currentPage: page,
         totalPages,
@@ -559,7 +662,7 @@ export class CoursesService {
     });
 
     if (!course) {
-      throw new NotFoundException(`${course.id} 코스를 찾지 못했습니다.`);
+      throw new NotFoundException(`${courseId} 코스를 찾지 못했습니다.`);
     }
 
     if (userId) {
@@ -614,7 +717,10 @@ export class CoursesService {
 
       return true;
     } catch (err) {
-      throw new Error(err);
+      if (err instanceof ConflictException) {
+        throw err;
+      }
+      throw new Error('수강신청 중 오류가 발생했습니다.');
     }
   }
   async getAllLectureActivities(courseId: string, userId: string) {
@@ -626,5 +732,274 @@ export class CoursesService {
     });
 
     return courseActivities;
+  }
+  async getCourseReviews(
+    courseId: string,
+    page: number,
+    pageSize: number,
+    sort: 'latest' | 'oldest' | 'rating_high' | 'rating_low',
+    userId?: string,
+  ): Promise<CourseReviewsResponseDto> {
+    const where: Prisma.CourseReviewWhereInput = {
+      courseId,
+    };
+    const orderBy: Prisma.CourseReviewOrderByWithRelationInput = {};
+
+    if (sort === 'latest') {
+      orderBy.createdAt = 'desc';
+    } else if (sort === 'oldest') {
+      orderBy.createdAt = 'asc';
+    } else if (sort === 'rating_high') {
+      orderBy.rating = 'desc';
+    } else if (sort === 'rating_low') {
+      orderBy.rating = 'asc';
+    }
+
+    const skip = (page - 1) * pageSize;
+    const totalItems = await this.prisma.courseReview.count({ where });
+    const totalPages = Math.ceil(totalItems / pageSize);
+    const hasNext = page < totalPages;
+    const hasPrev = page > 1;
+
+    const myReview =
+      userId &&
+      (await this.prisma.courseReview.findUnique({
+        where: {
+          userId_courseId: {
+            userId,
+            courseId,
+          },
+        },
+      }));
+
+    const reviews = await this.prisma.courseReview.findMany({
+      where,
+      orderBy,
+      skip,
+      take: pageSize,
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            image: true,
+          },
+        },
+      },
+    });
+
+    return {
+      myReviewExists: !!myReview,
+      totalReviewCount: totalItems,
+      currentPage: page,
+      pageSize,
+      totalPages,
+      hasNext,
+      hasPrev,
+      reviews: reviews as unknown as CourseReviewEntity[],
+    };
+  }
+
+  async createReview(
+    courseId: string,
+    userId: string,
+    createReviewDto: CreateReviewDto,
+  ): Promise<CourseReviewEntity> {
+    const course = await this.prisma.course.findUnique({
+      where: {
+        id: courseId,
+      },
+    });
+
+    if (!course) {
+      throw new NotFoundException('코스를 찾을 수 없습니다.');
+    }
+
+    const enrollment = await this.prisma.courseEnrollment.findUnique({
+      where: {
+        userId_courseId: {
+          userId,
+          courseId,
+        },
+      },
+    });
+
+    if (!enrollment) {
+      throw new UnauthorizedException(
+        '수강신청한 강의만 리뷰를 작성하실 수 있습니다.',
+      );
+    }
+
+    const existingReview = await this.prisma.courseReview.findFirst({
+      where: {
+        userId,
+        courseId,
+      },
+    });
+
+    if (existingReview) {
+      throw new ConflictException('이미 작성하신 리뷰가 있습니다.');
+    }
+
+    const review = await this.prisma.courseReview.create({
+      data: {
+        content: createReviewDto.content,
+        rating: createReviewDto.rating,
+        user: {
+          connect: {
+            id: userId,
+          },
+        },
+        course: {
+          connect: {
+            id: courseId,
+          },
+        },
+      },
+    });
+
+    return review as unknown as CourseReviewEntity;
+  }
+
+  async updateReview(
+    reviewId: string,
+    userId: string,
+    updateReviewDto: UpdateReviewDto,
+  ): Promise<CourseReviewEntity> {
+    const existingReview = await this.prisma.courseReview.findFirst({
+      where: {
+        id: reviewId,
+      },
+    });
+
+    if (!existingReview) {
+      throw new NotFoundException('작성하신 리뷰가 존재하지 않습니다.');
+    }
+
+    if (existingReview.userId !== userId) {
+      throw new UnauthorizedException('리뷰의 작성자만 수정할 수 있습니다.');
+    }
+
+    const response = await this.prisma.courseReview.update({
+      where: {
+        id: reviewId,
+      },
+      data: {
+        content: updateReviewDto.content,
+        rating: updateReviewDto.rating,
+      },
+    });
+
+    return response as unknown as CourseReviewEntity;
+  }
+
+  async deleteReview(reviewId: string, userId: string): Promise<boolean> {
+    const existingReview = await this.prisma.courseReview.findFirst({
+      where: {
+        id: reviewId,
+      },
+    });
+
+    if (!existingReview) {
+      throw new NotFoundException('작성하신 리뷰가 존재하지 않습니다.');
+    }
+
+    if (existingReview.userId !== userId) {
+      throw new UnauthorizedException('리뷰의 작성자만 삭제할 수 있습니다.');
+    }
+
+    await this.prisma.courseReview.delete({
+      where: {
+        id: reviewId,
+      },
+    });
+
+    return true;
+  }
+
+  async createInstructorReply(
+    reviewId: string,
+    userId: string,
+    instructorReplyDto: InstructorReplyDto,
+  ): Promise<CourseReviewEntity> {
+    const review = await this.prisma.courseReview.findUnique({
+      where: {
+        id: reviewId,
+      },
+      include: {
+        course: {
+          select: {
+            instructorId: true,
+          },
+        },
+      },
+    });
+
+    if (!review) {
+      throw new NotFoundException('리뷰를 찾을 수 없습니다.');
+    }
+
+    if (review.course.instructorId !== userId) {
+      throw new UnauthorizedException('강사만 답변을 작성할 수 있습니다.');
+    }
+
+    const updatedReview = await this.prisma.courseReview.update({
+      where: {
+        id: reviewId,
+      },
+      data: {
+        instructorReply: instructorReplyDto.instructorReply,
+      },
+    });
+
+    return updatedReview as unknown as CourseReviewEntity;
+  }
+  async getInstructorReviews(userId: string): Promise<CourseReviewEntity[]> {
+    const reviews = await this.prisma.courseReview.findMany({
+      where: {
+        course: {
+          instructorId: userId,
+        },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            image: true,
+          },
+        },
+        course: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+      },
+    });
+
+    // 답글이 없는 리뷰를 먼저 보여주고, 그 다음 답글이 있는 리뷰를 보여줌
+    // 각 그룹 내에서는 최신순으로 정렬
+    const sortedReviews = reviews.sort((a, b) => {
+      const aHasReply = !!a.instructorReply;
+      const bHasReply = !!b.instructorReply;
+      
+      // 답글이 없는 리뷰가 먼저 오도록
+      if (aHasReply !== bHasReply) {
+        return aHasReply ? 1 : -1;
+      }
+      
+      // 같은 그룹 내에서는 최신순으로 정렬
+      const dateA = new Date(a.createdAt).getTime();
+      const dateB = new Date(b.createdAt).getTime();
+      if (dateA !== dateB) {
+        return dateB - dateA;
+      }
+      
+      // createdAt이 같으면 id로 정렬
+      return b.id.localeCompare(a.id);
+    });
+
+    return sortedReviews as unknown as CourseReviewEntity[];
   }
 }
