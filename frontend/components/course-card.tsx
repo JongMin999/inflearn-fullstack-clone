@@ -90,13 +90,19 @@ export default function CourseCard({ user, course }: CourseCardProps) {
     className="group relative cursor-pointer overflow-hidden bg-white transition-all duration-300"
     onClick={() => router.push(`/course/${course.id}`)}>
       {/* 썸네일 이미지 */}
-      <div className="relative aspect-video overflow-hidden">
-        <Image
-          src={course.thumbnailUrl || "/placeholder-course.jpg"}
-          alt={course.title}
-          fill
-          className="rounded-md object-cover transition-transform duration-300 group-hover:scale-105"
-        />
+      <div className="relative aspect-video overflow-hidden bg-gray-200 rounded-md">
+        {course.thumbnailUrl ? (
+          <Image
+            src={course.thumbnailUrl}
+            alt={course.title}
+            fill
+            className="rounded-md object-cover transition-transform duration-300 group-hover:scale-105"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-200 to-gray-300">
+            <span className="text-gray-400 text-sm font-medium">이미지 없음</span>
+          </div>
+        )}
 
         {/* 호버 시 보이는 액션 버튼들 */}
         <div className="absolute right-2 top-2 flex gap-2 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
@@ -138,60 +144,71 @@ export default function CourseCard({ user, course }: CourseCardProps) {
           {course.title}
         </h3>
 
-        {course.shortDescription && (
-          <p
-            className="mb-3 text-xs text-gray-600 overflow-hidden"
-            style={{
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-            }}
-          >
-            {course.shortDescription}
-          </p>
-        )}
+        {/* 설명 영역 - 고정 높이로 일정한 공간 확보 */}
+        <div className="mb-3 min-h-[2.5rem]">
+          {course.shortDescription ? (
+            <p
+              className="text-xs text-gray-600 overflow-hidden"
+              style={{
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+              }}
+            >
+              {course.shortDescription}
+            </p>
+          ) : (
+            <div className="h-[2.5rem]"></div>
+          )}
+        </div>
 
         {/* 레벨 및 강사 정보 */}
         <div className="mb-3 flex items-center gap-2 text-xs text-gray-500">
-          <span className="rounded bg-gray-100 px-2 py-1">
+          <span className="rounded bg-gray-100 px-2 py-1 whitespace-nowrap">
             {getLevelText(course.level)}
           </span>
-          <span>{course.instructor?.name || "강사명"}</span>
+          <span className="truncate">{course.instructor?.name || "강사명"}</span>
         </div>
 
         {/* 가격 정보 */}
-        <div className="flex items-center justify-between">
-          <div className="flex flex-col">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex flex-col min-w-0 flex-1">
             {course.discountPrice && course.discountPrice < course.price ? (
               <>
-                <span className="text-xs text-gray-400 line-through">
+                <span className="text-xs text-gray-400 line-through whitespace-nowrap">
                   ₩{formatPrice(course.price)}
                 </span>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded whitespace-nowrap">
                     {calculateDiscountPercentage(
                       course.price,
                       course.discountPrice
                     )}
                     % 할인
                   </span>
-                  <span className="text-sm font-bold text-gray-900">
+                  <span className="text-sm font-bold text-gray-900 whitespace-nowrap">
                     ₩{formatPrice(course.discountPrice)}
                   </span>
                 </div>
               </>
             ) : (
-              <span className="text-sm font-bold text-gray-900">
+              <span className="text-sm font-bold text-gray-900 whitespace-nowrap">
                 ₩{formatPrice(course.price)}
               </span>
             )}
           </div>
 
-          {/* 평점 정보 (임시로 하드코딩) */}
-          <div className="flex items-center gap-1 text-xs">
+          {/* 평점 정보 */}
+          <div className="flex items-center gap-1 text-xs shrink-0">
             <span className="text-yellow-500">★</span>
-            <span className="font-medium">4.8</span>
-            <span className="text-gray-400">(213)</span>
+            <span className="font-medium whitespace-nowrap">
+              {(course as any).averageRating
+                ? (course as any).averageRating.toFixed(1)
+                : "0.0"}
+            </span>
+            <span className="text-gray-400 whitespace-nowrap">
+              ({(course as any).totalReviews || 0})
+            </span>
           </div>
         </div>
       </div>
