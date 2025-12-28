@@ -284,19 +284,40 @@ function DeleteConfirmDialog({
   onConfirm: () => void;
   isLoading: boolean;
 }) {
+  if (!isOpen) return null;
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle className="text-center">수강평 삭제</DialogTitle>
-          <DialogDescription className="text-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* 오버레이 */}
+      <div
+        className="fixed inset-0 bg-black/50 animate-in fade-in-0"
+        onClick={onClose}
+      />
+      
+      {/* 모달 컨텐츠 */}
+      <div className="relative z-50 w-full max-w-sm mx-4 bg-white rounded-lg shadow-lg p-6 animate-in fade-in-0 zoom-in-95">
+        {/* 헤더 */}
+        <div className="mb-6">
+          <h2 className="text-center text-lg font-semibold">수강평 삭제</h2>
+          {/* 닫기 버튼 */}
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+            aria-label="닫기"
+          >
+            <XIcon className="size-5" />
+          </button>
+        </div>
+
+        <div className="space-y-6 py-4">
+          <p className="text-center text-gray-600">
             정말로 이 수강평을 삭제하시겠습니까?
             <br />
             삭제된 수강평은 복구할 수 없습니다.
-          </DialogDescription>
-        </DialogHeader>
+          </p>
+        </div>
 
-        <DialogFooter className="flex gap-2">
+        <div className="flex gap-2 mt-6">
           <button
             onClick={onClose}
             disabled={isLoading}
@@ -315,9 +336,9 @@ function DeleteConfirmDialog({
               "삭제"
             )}
           </button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -446,6 +467,50 @@ function Introduction({ course }: { course: CourseDetailDto }) {
   );
 }
 
+function VideoPreviewModal({
+  lecture,
+  isOpen,
+  onClose,
+}: {
+  lecture: LectureEntity | null;
+  isOpen: boolean;
+  onClose: () => void;
+}) {
+  const videoUrl = lecture?.videoStorageInfo
+    ? (lecture.videoStorageInfo as any)?.cloudFront?.url
+    : null;
+
+  if (!lecture || !videoUrl) {
+    return null;
+  }
+
+  const handleContextMenu = (e: React.MouseEvent<HTMLVideoElement>) => {
+    e.preventDefault();
+    return false;
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose} modal={false}>
+      <DialogContent className="sm:max-w-4xl w-full">
+        <DialogHeader>
+          <DialogTitle>{lecture.title}</DialogTitle>
+        </DialogHeader>
+        <div className="w-full aspect-video bg-black rounded-md overflow-hidden">
+          <video
+            src={videoUrl}
+            controls
+            controlsList="nodownload noplaybackrate"
+            className="w-full h-full"
+            autoPlay
+            onContextMenu={handleContextMenu}
+            disablePictureInPicture
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function LectureRow({
   lecture,
   className,
@@ -453,33 +518,42 @@ function LectureRow({
   lecture: LectureEntity;
   className?: string;
 }) {
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+
   return (
-    <div
-      className={cn(
-        "flex items-center justify-between text-sm px-4 py-3",
-        className
-      )}
-    >
-      <div className="flex items-center gap-2">
-        {lecture.isPreview ? (
-          <PlayCircleIcon className="size-4 text-primary" />
-        ) : (
-          <LockIcon className="size-4 text-muted-foreground" />
+    <>
+      <div
+        className={cn(
+          "flex items-center justify-between text-sm px-4 py-3",
+          className
         )}
-        <span>{lecture.title}</span>
+      >
+        <div className="flex items-center gap-2">
+          {lecture.isPreview ? (
+            <PlayCircleIcon className="size-4 text-primary" />
+          ) : (
+            <LockIcon className="size-4 text-muted-foreground" />
+          )}
+          <span>{lecture.title}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {lecture.isPreview && (
+            <button
+              onClick={() => setShowPreviewModal(true)}
+              className="cursor-pointer text-sm px-2 py-1 border border-gray-400 text-gray-800 font-semibold rounded-md hover:bg-gray-50"
+            >
+              미리보기
+            </button>
+          )}
+          <span>{formatSecondsToMinSec(lecture.duration)}</span>
+        </div>
       </div>
-      <div className="flex items-center gap-2">
-        {lecture.isPreview && (
-          <button
-            onClick={() => alert("구현 예정")}
-            className="cursor-pointer text-sm px-2 py-1 border border-gray-400 text-gray-800 font-semibold rounded-md"
-          >
-            미리보기
-          </button>
-        )}
-        <span>{formatSecondsToMinSec(lecture.duration)}</span>
-      </div>
-    </div>
+      <VideoPreviewModal
+        lecture={lecture}
+        isOpen={showPreviewModal}
+        onClose={() => setShowPreviewModal(false)}
+      />
+    </>
   );
 }
 
