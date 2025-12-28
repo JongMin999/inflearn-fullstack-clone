@@ -11,13 +11,18 @@ export const metadata: Metadata = {
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ page_number?: string }>;
+  searchParams: Promise<{ page_number?: string; sortBy?: string }>;
 }) {
-  const { page_number } = await searchParams;
+  const { page_number, sortBy } = await searchParams;
 
   return (
     <div className="p-6">
-      <CourseList q={""} page={page_number ? parseInt(page_number) : 1} />
+      <CourseList
+        q={""}
+        page={page_number ? parseInt(page_number) : 1}
+        sortBy={(sortBy as "latest" | "popular" | "recommended") || "latest"}
+        baseUrl="/"
+      />
     </div>
   );
 }

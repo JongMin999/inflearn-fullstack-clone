@@ -18,16 +18,18 @@ export default async function CoursesPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ page_number?: string }>;
+  searchParams: Promise<{ page_number?: string; sortBy?: string }>;
 }) {
   const { slug } = await params;
-  const { page_number } = await searchParams;
+  const { page_number, sortBy } = await searchParams;
 
   return (
     <div className="p-6">
       <CourseList
         category={slug || undefined}
         page={page_number ? parseInt(page_number) : 1}
+        sortBy={(sortBy as "latest" | "popular" | "recommended") || "latest"}
+        baseUrl={`/courses/${slug}`}
       />
     </div>
   );

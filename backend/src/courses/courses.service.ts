@@ -9,6 +9,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { Course, Prisma } from '@prisma/client';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
+import slugify from 'slugify';
 import { SearchCourseDto } from './dto/search-course.dto';
 import { SearchCourseResponseDto } from './dto/search-response.dto';
 import { CourseDetailDto } from './dto/course-detail.dto';
@@ -19,7 +20,6 @@ import { CourseReview as CourseReviewEntity } from 'src/_gen/prisma-class/course
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { InstructorReplyDto } from './dto/instructor-reply.dto';
 import { CourseReviewsResponseDto } from './dto/course-reviews-response.dto';
-import slugify from 'slugify';
 
 @Injectable()
 export class CoursesService {
@@ -33,25 +33,25 @@ export class CoursesService {
       lower: true,
       strict: true,
     });
-    
+
     // 중복된 slug가 있는지 확인하고 고유한 slug 생성
     let slug = baseSlug;
     let counter = 1;
-    
+
     while (true) {
       const existingCourse = await this.prisma.course.findUnique({
         where: { slug },
       });
-      
+
       if (!existingCourse) {
         break;
       }
-      
+
       slug = `${baseSlug}-${counter}`;
       counter++;
     }
 
-    const { categoryIds, slug: _, ...courseData } = createCourseDto;
+    const { categoryIds, slug: _, isPublished, ...courseData } = createCourseDto;
 
     const data: Prisma.CourseCreateInput = {
       title: createCourseDto.title,
@@ -59,7 +59,7 @@ export class CoursesService {
       instructor: {
         connect: { id: userId },
       },
-      status: 'DRAGT',
+      status: 'DRAFT',
       ...courseData,
     };
 
@@ -238,6 +238,11 @@ export class CoursesService {
     }
 
     const isInstructor = course.instructorId === userId;
+    
+    // 강사가 아닌 경우 PUBLISHED 상태인 강의만 조회 가능
+    if (!isInstructor && course.status !== 'PUBLISHED') {
+      return null;
+    }
     const isEnrolled = userId
       ? !!(await this.prisma.courseEnrollment.findFirst({
           where: {
@@ -277,7 +282,7 @@ export class CoursesService {
 
     // 지식공유자 통계 계산
     const instructorId = course.instructorId;
-    
+
     // 해당 강사의 모든 강의에 등록된 총 수강생 수 (중복 제거)
     const uniqueStudents = await this.prisma.courseEnrollment.findMany({
       where: {
@@ -410,16 +415,21 @@ export class CoursesService {
 
     return course;
   }
+
   async searchCourses(
     searchCourseDto: SearchCourseDto,
   ): Promise<SearchCourseResponseDto> {
-    const { q, category, priceRange, sortBy, order, page, pageSize } =
+    const { q, category, priceRange, sortBy = 'latest', page, pageSize } =
       searchCourseDto;
 
-    const where: Prisma.CourseWhereInput = {};
+    const where: Prisma.CourseWhereInput = {
+      // PUBLISHED 상태인 강의만 표시
+      status: 'PUBLISHED',
+    };
 
     // 키워드 검색 (강의명, 강사명에서 부분 일치)
-    if (q) {
+    // 공백만 있거나 비어있으면 검색 조건을 추가하지 않음 (전체 강의 표시)
+    if (q && q.trim()) {
       // 공백을 제거한 검색어 (예: "앱 개발" -> "앱개발")
       const normalized = q.replace(/\s+/g, '');
 
@@ -522,21 +532,35 @@ export class CoursesService {
     }
 
     // 정렬 조건
-    const orderBy: Prisma.CourseOrderByWithRelationInput = {};
-    if (sortBy === 'price') {
-      orderBy.price = order as 'asc' | 'desc';
+    let orderBy: Prisma.CourseOrderByWithRelationInput | Prisma.CourseOrderByWithRelationInput[] = {};
+    let needInMemorySort = false;
+
+    if (sortBy === 'latest') {
+      orderBy = { createdAt: 'desc' };
+    } else if (sortBy === 'price_high') {
+      orderBy = { price: 'desc' };
+    } else if (sortBy === 'price_low') {
+      orderBy = { price: 'asc' };
+    } else if (sortBy === 'popular' || sortBy === 'recommended') {
+      // 인기순과 추천순은 count 기반 정렬이므로 메모리에서 정렬 필요
+      needInMemorySort = true;
+      // 먼저 최신순으로 가져온 후 메모리에서 정렬
+      orderBy = { createdAt: 'desc' };
     }
 
     // 페이지네이션 계산
-    const skip = (page - 1) * pageSize;
     const totalItems = await this.prisma.course.count({ where });
-
+    
     // 강의 목록 조회
+    // 인기순/추천순의 경우 더 많은 데이터를 가져와서 정렬 후 페이지네이션
+    const take = needInMemorySort ? totalItems : pageSize;
+    const skip = needInMemorySort ? 0 : (page - 1) * pageSize;
+
     const courses = await this.prisma.course.findMany({
       where,
       orderBy,
       skip,
-      take: pageSize,
+      take,
       include: {
         instructor: {
           select: {
@@ -554,13 +578,14 @@ export class CoursesService {
           select: {
             enrollments: true,
             reviews: true,
+            favorites: true,
           },
         },
       },
     });
 
-    // averageRating과 totalReviews 계산
-    const coursesWithStats = courses.map((course) => {
+    // averageRating과 totalReviews 계산 및 정렬
+    let coursesWithStats = courses.map((course) => {
       const averageRating =
         course.reviews.length > 0
           ? Math.round(
@@ -570,13 +595,33 @@ export class CoursesService {
             ) / 10
           : 0;
       const totalReviews = course._count.reviews;
+      const totalEnrollments = course._count.enrollments;
 
       return {
         ...course,
         averageRating,
         totalReviews,
+        totalEnrollments,
       } as any;
     });
+
+    // 메모리에서 정렬 (인기순, 추천순)
+    if (needInMemorySort) {
+      if (sortBy === 'popular') {
+        coursesWithStats.sort((a, b) => {
+          return b._count.enrollments - a._count.enrollments;
+        });
+      } else if (sortBy === 'recommended') {
+        coursesWithStats.sort((a, b) => {
+          return b._count.favorites - a._count.favorites;
+        });
+      }
+
+      // 정렬 후 페이지네이션 적용
+      const startIndex = (page - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      coursesWithStats = coursesWithStats.slice(startIndex, endIndex);
+    }
 
     // 페이지네이션 정보 계산
     const totalPages = Math.ceil(totalItems / pageSize);
@@ -594,6 +639,7 @@ export class CoursesService {
       },
     };
   }
+
   async addFavorite(courseId: string, userId: string): Promise<boolean> {
     try {
       const existingFavorite = await this.prisma.courseFavorite.findFirst({
@@ -723,6 +769,7 @@ export class CoursesService {
       throw new Error('수강신청 중 오류가 발생했습니다.');
     }
   }
+
   async getAllLectureActivities(courseId: string, userId: string) {
     const courseActivities = await this.prisma.lectureActivity.findMany({
       where: {
@@ -733,6 +780,7 @@ export class CoursesService {
 
     return courseActivities;
   }
+
   async getCourseReviews(
     courseId: string,
     page: number,
@@ -954,6 +1002,7 @@ export class CoursesService {
 
     return updatedReview as unknown as CourseReviewEntity;
   }
+
   async getInstructorReviews(userId: string): Promise<CourseReviewEntity[]> {
     const reviews = await this.prisma.courseReview.findMany({
       where: {
@@ -983,19 +1032,19 @@ export class CoursesService {
     const sortedReviews = reviews.sort((a, b) => {
       const aHasReply = !!a.instructorReply;
       const bHasReply = !!b.instructorReply;
-      
+
       // 답글이 없는 리뷰가 먼저 오도록
       if (aHasReply !== bHasReply) {
         return aHasReply ? 1 : -1;
       }
-      
+
       // 같은 그룹 내에서는 최신순으로 정렬
       const dateA = new Date(a.createdAt).getTime();
       const dateB = new Date(b.createdAt).getTime();
       if (dateA !== dateB) {
         return dateB - dateA;
       }
-      
+
       // createdAt이 같으면 id로 정렬
       return b.id.localeCompare(a.id);
     });

@@ -11,6 +11,8 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { auth } from "@/auth";
+import CourseSortSelector from "./course-sort-selector";
+import { Suspense } from "react";
 
 interface CourseListProps extends SearchCourseDto {
   baseUrl?: string;
@@ -20,19 +22,17 @@ export default async function CourseList({
   q,
   category,
   priceRange,
-  sortBy = "price",
-  order = "asc",
+  sortBy = "latest",
   page = 1,
   pageSize = 20,
   baseUrl = "",
 }: CourseListProps) {
   const session = await auth();
   const { data, error } = await api.searchCourses({
-    q,
+    q: q?.trim() || undefined, // 공백만 있으면 undefined로 전달
     category,
     priceRange,
     sortBy,
-    order,
     page,
     pageSize,
   });
@@ -67,28 +67,10 @@ export default async function CourseList({
     );
   }
 
-  // 좋아요된 강의를 앞으로 정렬
-  let sortedCourses = [...data.courses];
-  if (session?.user) {
-    const favoritesResult = await api.getMyFavorites();
-    const favoriteCourseIds = new Set(
-      favoritesResult.data?.map((fav) => fav.courseId) || []
-    );
-
-    sortedCourses = sortedCourses.sort((a, b) => {
-      const aIsFavorite = favoriteCourseIds.has(a.id);
-      const bIsFavorite = favoriteCourseIds.has(b.id);
-      
-      // 좋아요된 강의를 앞으로
-      if (aIsFavorite && !bIsFavorite) return -1;
-      if (!aIsFavorite && bIsFavorite) return 1;
-      return 0;
-    });
-  }
-
   const buildPageUrl = (pageNumber: number) => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
+    if (sortBy) params.set("sortBy", sortBy);
     params.set("page_number", pageNumber.toString());
     
     return `${baseUrl}?${params.toString()}`;
@@ -156,9 +138,16 @@ export default async function CourseList({
 
   return (
     <div className="w-full">
+      {/* 정렬 선택기 */}
+      <div className="mb-6 h-9 flex items-center justify-end">
+        <Suspense fallback={<div className="w-[120px] h-9" />}>
+          <CourseSortSelector currentSort={sortBy} />
+        </Suspense>
+      </div>
+
       {/* 강의 목록 Grid */}
-      <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-        {sortedCourses.map((course) => (
+      <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 w-full">
+        {data.courses.map((course) => (
           <CourseCard key={course.id} course={course} user={session?.user} />
         ))}
       </div>
