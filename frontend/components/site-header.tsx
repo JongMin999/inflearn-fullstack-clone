@@ -81,7 +81,12 @@ export default function SiteHeader({
                 if (e.key === "Enter") {
                   if (search.trim()) {
                     router.push(`/search?q=${search}`);
+                  } else {
+                    router.push("/");
                   }
+                } else if (e.key === " ") {
+                  e.preventDefault();
+                  router.push("/");
                 }
               }}
             />
@@ -92,6 +97,8 @@ export default function SiteHeader({
               onClick={() => {
                 if (search.trim()) {
                   router.push(`/search?q=${search}`);
+                } else {
+                  router.push("/");
                 }
               }}
             >
