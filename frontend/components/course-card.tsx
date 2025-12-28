@@ -4,7 +4,7 @@ import {
   Course as CourseEntity,
   CourseFavorite as CourseFavoriteEntity,
 } from "@/generated/openapi-client";
-import { HeartIcon, ShoppingCart } from "lucide-react";
+import { HeartIcon, ShoppingCart, Star, User as UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -13,6 +13,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import * as api from "@/lib/api";
 import { User } from "next-auth";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
 
 interface CourseCardProps {
   user?: User;
@@ -21,6 +22,8 @@ interface CourseCardProps {
 
 export default function CourseCard({ user, course }: CourseCardProps) {
   const router = useRouter();
+  const [isHovered, setIsHovered] = useState(false);
+  
   const getMyFavoritesQuery = useQuery({
     queryKey: ["my-favorites", user?.id],
     queryFn: async () => {
@@ -87,10 +90,12 @@ export default function CourseCard({ user, course }: CourseCardProps) {
 
   return (
     <div
-    className="group relative cursor-pointer overflow-hidden bg-white transition-all duration-300"
-    onClick={() => router.push(`/course/${course.id}`)}>
+      className="group relative cursor-pointer bg-white transition-all duration-300"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       {/* 썸네일 이미지 */}
-      <div className="relative aspect-video overflow-hidden bg-gray-200 rounded-md">
+      <div className="relative aspect-video overflow-hidden bg-gray-200 rounded-md w-full">
         {course.thumbnailUrl ? (
           <Image
             src={course.thumbnailUrl}
@@ -105,7 +110,7 @@ export default function CourseCard({ user, course }: CourseCardProps) {
         )}
 
         {/* 호버 시 보이는 액션 버튼들 */}
-        <div className="absolute right-2 top-2 flex gap-2 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+        <div className="absolute right-2 top-2 flex gap-2 opacity-0 transition-opacity duration-300 group-hover:opacity-100 z-10">
           <Button
             size="sm"
             variant="secondary"
@@ -131,87 +136,182 @@ export default function CourseCard({ user, course }: CourseCardProps) {
         </div>
       </div>
 
-      {/* 강의 정보 */}
-      <div className="py-2">
-        <h3
-          className="mb-2 text-md font-semibold text-gray-900 overflow-hidden"
-          style={{
-            display: "-webkit-box",
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: "vertical",
-          }}
-        >
-          {course.title}
-        </h3>
-
-        {/* 설명 영역 - 고정 높이로 일정한 공간 확보 */}
-        <div className="mb-3 min-h-[2.5rem]">
-          {course.shortDescription ? (
-            <p
-              className="text-xs text-gray-600 overflow-hidden"
-              style={{
-                display: "-webkit-box",
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: "vertical",
-              }}
-            >
-              {course.shortDescription}
-            </p>
-          ) : (
-            <div className="h-[2.5rem]"></div>
-          )}
-        </div>
-
-        {/* 레벨 및 강사 정보 */}
-        <div className="mb-3 flex items-center gap-2 text-xs text-gray-500">
-          <span className="rounded bg-gray-100 px-2 py-1 whitespace-nowrap">
-            {getLevelText(course.level)}
-          </span>
-          <span className="truncate">{course.instructor?.name || "강사명"}</span>
+      {/* 기본 강의 정보 */}
+      <div className="py-2 space-y-2">
+        {/* 제목과 지식공유자 */}
+        <div className="space-y-1">
+          <h3
+            className="text-sm font-semibold text-gray-900 overflow-hidden leading-tight"
+            style={{
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+            }}
+          >
+            {course.title}
+          </h3>
+          <p className="text-xs text-gray-600">
+            {course.instructor?.name || "강사명"}
+          </p>
         </div>
 
         {/* 가격 정보 */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex flex-col min-w-0 flex-1">
-            {course.discountPrice && course.discountPrice < course.price ? (
-              <>
-                <span className="text-xs text-gray-400 line-through whitespace-nowrap">
-                  ₩{formatPrice(course.price)}
-                </span>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded whitespace-nowrap">
-                    {calculateDiscountPercentage(
-                      course.price,
-                      course.discountPrice
-                    )}
-                    % 할인
-                  </span>
-                  <span className="text-sm font-bold text-gray-900 whitespace-nowrap">
-                    ₩{formatPrice(course.discountPrice)}
-                  </span>
-                </div>
-              </>
-            ) : (
-              <span className="text-sm font-bold text-gray-900 whitespace-nowrap">
+        <div className="space-y-1">
+          {course.discountPrice && course.discountPrice < course.price ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-bold text-gray-900">
+                ₩{formatPrice(course.discountPrice)}
+              </span>
+              <span className="text-xs text-red-500 font-semibold">
+                {calculateDiscountPercentage(course.price, course.discountPrice)}%
+              </span>
+              <span className="text-xs text-gray-400 line-through">
                 ₩{formatPrice(course.price)}
               </span>
-            )}
-          </div>
+            </div>
+          ) : (
+            <span className="text-sm font-bold text-gray-900">
+              ₩{formatPrice(course.price)}
+            </span>
+          )}
+        </div>
 
-          {/* 평점 정보 */}
-          <div className="flex items-center gap-1 text-xs shrink-0">
-            <span className="text-yellow-500">★</span>
-            <span className="font-medium whitespace-nowrap">
+        {/* 난이도 / 카테고리 */}
+        <div className="flex items-center gap-1 text-xs text-gray-600">
+          <span>{getLevelText(course.level)}</span>
+          {course.categories && course.categories.length > 0 && (
+            <>
+              <span> / </span>
+              <span className="truncate">
+                {course.categories.map((cat) => cat.name).join(", ")}
+              </span>
+            </>
+          )}
+        </div>
+
+        {/* 별점, 리뷰 수, 수강생 수 */}
+        <div className="flex items-center gap-3 text-xs text-gray-600">
+          {/* 별점과 리뷰 수 */}
+          <div className="flex items-center gap-1">
+            <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+            <span className="font-medium text-gray-900">
               {(course as any).averageRating
                 ? (course as any).averageRating.toFixed(1)
                 : "0.0"}
             </span>
-            <span className="text-gray-400 whitespace-nowrap">
+            <span className="text-gray-500">
               ({(course as any).totalReviews || 0})
             </span>
           </div>
+          {/* 수강생 수 */}
+          {(course as any).totalEnrollments !== undefined && (
+            <div className="flex items-center gap-1">
+              <UserIcon className="w-3 h-3 text-gray-500" />
+              <span>
+                {((course as any).totalEnrollments || 0).toLocaleString()}+
+              </span>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* 호버 시 표시되는 상세 정보 오버레이 */}
+      <div
+        className={cn(
+          "absolute inset-0 bg-white border border-gray-200 rounded-md shadow-lg p-4 z-50 flex flex-col transition-opacity duration-300",
+          isHovered ? "opacity-100" : "opacity-0 pointer-events-none"
+        )}
+        onClick={(e) => {
+          e.stopPropagation();
+          router.push(`/course/${course.id}`);
+        }}
+      >
+          {/* 제목 */}
+          <h3 className="text-base font-bold text-gray-900 mb-2 line-clamp-2">
+            {course.title}
+          </h3>
+
+          {/* 상세 설명 */}
+          {course.shortDescription && (
+            <p className="text-sm text-gray-600 mb-4 line-clamp-3">
+              {course.shortDescription}
+            </p>
+          )}
+
+          {/* 난이도 / 카테고리 */}
+          <div className="flex items-center gap-1 text-xs text-gray-600 mb-3">
+            <span>{getLevelText(course.level)}</span>
+            {course.categories && course.categories.length > 0 && (
+              <>
+                <span> / </span>
+                <span className="truncate">
+                  {course.categories.map((cat) => cat.name).join(", ")}
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* 별점, 리뷰 수, 수강생 수 */}
+          <div className="flex items-center gap-3 text-xs text-gray-600 mb-4">
+            {/* 별점과 리뷰 수 */}
+            <div className="flex items-center gap-1">
+              <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+              <span className="font-medium text-gray-900">
+                {(course as any).averageRating
+                  ? (course as any).averageRating.toFixed(1)
+                  : "0.0"}
+              </span>
+              <span className="text-gray-500">
+                ({(course as any).totalReviews || 0})
+              </span>
+            </div>
+            {/* 수강생 수 */}
+            {(course as any).totalEnrollments !== undefined && (
+              <div className="flex items-center gap-1">
+                <UserIcon className="w-3 h-3 text-gray-500" />
+                <span>
+                  {((course as any).totalEnrollments || 0).toLocaleString()}+
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* 좋아요와 장바구니 담기 버튼 - 하단 고정 */}
+          <div className="flex items-center gap-2 mt-auto pt-3 border-t border-gray-200 shrink-0">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 px-3 text-xs"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleFavoriteClick(e);
+              }}
+              disabled={isFavoriteDisabled}
+            >
+              <HeartIcon
+                className={cn(
+                  "size-4 mr-1 transition-colors",
+                  isFavorite ? "fill-red-500 text-red-500" : "text-gray-500",
+                  isFavoriteDisabled && "cursor-not-allowed"
+                )}
+              />
+              <span className="text-xs">
+                {(course as any)._count?.favorites ?? 0}
+              </span>
+            </Button>
+            <Button
+              size="sm"
+              variant="default"
+              className="flex-1 h-8 text-xs bg-[#1dc078] hover:bg-[#1ab06a] text-white"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleCartClick(e);
+              }}
+            >
+              장바구니 담기
+            </Button>
+          </div>
+        </div>
     </div>
   );
 }
