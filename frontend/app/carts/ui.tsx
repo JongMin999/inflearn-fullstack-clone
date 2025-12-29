@@ -2,7 +2,7 @@
 
 import { Course } from "@/generated/openapi-client";
 import Image from "next/image";
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,6 +26,7 @@ export default function CartUI() {
     customerName: "",
     customerPhone: "",
   });
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("ko-KR").format(price);
@@ -43,6 +44,63 @@ export default function CartUI() {
     queryKey: ["cart-items"],
   });
 
+  // 장바구니 아이템이 로드되면 모든 아이템을 기본 선택
+  useEffect(() => {
+    if (cartItemsQuery.data?.data?.items) {
+      const allItemIds = new Set(
+        cartItemsQuery.data.data.items.map((item) => item.id)
+      );
+      setSelectedItems(allItemIds);
+    }
+  }, [cartItemsQuery.data?.data?.items]);
+
+  // 전체 선택/해제 핸들러
+  const handleSelectAll = (checked: boolean) => {
+    if (checked && cartItemsQuery.data?.data?.items) {
+      const allItemIds = new Set(
+        cartItemsQuery.data.data.items.map((item) => item.id)
+      );
+      setSelectedItems(allItemIds);
+    } else {
+      setSelectedItems(new Set());
+    }
+  };
+
+  // 개별 아이템 선택/해제 핸들러
+  const handleItemSelect = (itemId: string, checked: boolean) => {
+    const newSelected = new Set(selectedItems);
+    if (checked) {
+      newSelected.add(itemId);
+    } else {
+      newSelected.delete(itemId);
+    }
+    setSelectedItems(newSelected);
+  };
+
+  // 전체 선택 여부 확인
+  const isAllSelected =
+    cartItemsQuery.data?.data?.items &&
+    cartItemsQuery.data.data.items.length > 0 &&
+    selectedItems.size === cartItemsQuery.data.data.items.length;
+
+  // 선택된 아이템들의 가격 계산
+  const selectedItemsData = cartItemsQuery.data?.data?.items.filter((item) =>
+    selectedItems.has(item.id)
+  ) ?? [];
+
+  const selectedTotalOriginalPrice = selectedItemsData.reduce(
+    (sum, item) => sum + item.course.price,
+    0
+  );
+
+  const selectedTotalDiscountPrice = selectedItemsData.reduce(
+    (sum, item) =>
+      sum + (item.course.discountPrice || item.course.price),
+    0
+  );
+
+  const selectedTotalDiscount = selectedTotalOriginalPrice - selectedTotalDiscountPrice;
+
   const removeFromCartMutation = useMutation({
     mutationFn: (courseId: string) => api.removeFromCart(courseId),
     onSuccess: () => {
@@ -50,13 +108,6 @@ export default function CartUI() {
     },
   });
 
-  const totalOriginalPrice = cartItemsQuery.data?.data?.totalAmount ?? 0;
-  const totalDiscountPrice =
-    cartItemsQuery?.data?.data?.items.reduce(
-      (sum, item) => sum + (item.course.discountPrice || item.course.price),
-      0
-    ) ?? 0;
-  const totalDiscount = totalOriginalPrice - totalDiscountPrice;
 
   const handlePayment = () => {
     if (
@@ -96,12 +147,20 @@ export default function CartUI() {
         {/* 좌측: 장바구니 아이템들 */}
         <div className="space-y-4">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">
-              전체선택{" "}
-              <span className="text-green-600">
-                1/{cartItemsQuery?.data?.data?.totalCount}
-              </span>
-            </h2>
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={isAllSelected}
+                onChange={(e) => handleSelectAll(e.target.checked)}
+                className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+              />
+              <h2 className="text-lg font-semibold">
+                전체선택{" "}
+                <span className="text-green-600">
+                  {selectedItems.size}/{cartItemsQuery?.data?.data?.totalCount}
+                </span>
+              </h2>
+            </div>
           </div>
 
           {cartItemsQuery?.data?.data?.items.map((item) => (
@@ -111,7 +170,8 @@ export default function CartUI() {
             >
               <input
                 type="checkbox"
-                defaultChecked
+                checked={selectedItems.has(item.id)}
+                onChange={(e) => handleItemSelect(item.id, e.target.checked)}
                 className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
               />
 
@@ -278,17 +338,17 @@ export default function CartUI() {
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span>상품 금액</span>
-                <span>₩{formatPrice(totalOriginalPrice)}</span>
+                <span>₩{formatPrice(selectedTotalOriginalPrice)}</span>
               </div>
-              {totalDiscount > 0 && (
+              {selectedTotalDiscount > 0 && (
                 <div className="flex justify-between text-red-600">
                   <span>할인 금액</span>
-                  <span>-₩{formatPrice(totalDiscount)}</span>
+                  <span>-₩{formatPrice(selectedTotalDiscount)}</span>
                 </div>
               )}
               <div className="border-t pt-2 flex justify-between font-bold text-lg">
                 <span>총 결제 금액</span>
-                <span>₩{formatPrice(totalDiscountPrice)}</span>
+                <span>₩{formatPrice(selectedTotalDiscountPrice)}</span>
               </div>
             </div>
 
