@@ -2,6 +2,9 @@
 
 import {
   categoriesControllerFindAll,
+  commentsControllerCreate,
+  commentsControllerRemove,
+  commentsControllerUpdate,
   coursesControllerAddFavorite,
   coursesControllerCreate,
   coursesControllerCreateInstructorReply,
@@ -21,6 +24,8 @@ import {
   coursesControllerUpdate,
   CoursesControllerUpdateData,
   coursesControllerUpdateReview,
+  CreateCommentDto,
+  CreateQuestionDto,
   CreateReviewDto,
   InstructorReplyDto,
   lecturesControllerCreate,
@@ -29,12 +34,20 @@ import {
   lecturesControllerUpdateLectureActivity,
   SearchCourseDto,
   mediaControllerUploadMedia,
+  questionsControllerCreate,
+  questionsControllerFindAll,
+  questionsControllerFindAllByInstructorId,
+  questionsControllerFindOne,
+  questionsControllerRemove,
+  questionsControllerUpdate,
   sectionsControllerCreate,
   sectionsControllerDelete,
   sectionsControllerUpdate,
+  UpdateCommentDto,
   UpdateCourseDto,
   UpdateLectureActivityDto,
   UpdateLectureDto,
+  UpdateQuestionDto,
   UpdateReviewDto,
   UpdateUserDto,
   usersControllerGetProfile,
@@ -391,6 +404,108 @@ export const createInstructorReply = async (
     },
     body: instructorReplyDto,
   });
+
+  return { data, error };
+};
+
+export const findAllQuestions = async (courseId: string) => {
+  const { data, error } = await questionsControllerFindAll({
+    path: {
+      courseId,
+    },
+  });
+
+  return { data, error };
+};
+
+export const createQuestion = async (
+  courseId: string,
+  createQuestionDto: CreateQuestionDto
+) => {
+  const { data, error } = await questionsControllerCreate({
+    path: {
+      courseId,
+    },
+    body: createQuestionDto,
+  });
+
+  return { data, error };
+};
+
+export const findOneQuestion = async (questionId: string) => {
+  const { data, error } = await questionsControllerFindOne({
+    path: {
+      questionId,
+    },
+  });
+
+  return { data, error };
+};
+
+export const updateQuestion = async (
+  questionId: string,
+  updateQuestionDto: UpdateQuestionDto
+) => {
+  const { data, error } = await questionsControllerUpdate({
+    path: {
+      questionId,
+    },
+    body: updateQuestionDto,
+  });
+
+  return { data, error };
+};
+
+export const removeQuestion = async (questionId: string) => {
+  const { data, error } = await questionsControllerRemove({
+    path: {
+      questionId,
+    },
+  });
+
+  return { data, error };
+};
+
+export const createComment = async (
+  questionId: string,
+  createCommentDto: CreateCommentDto
+) => {
+  const { data, error } = await commentsControllerCreate({
+    path: {
+      questionId,
+    },
+    body: createCommentDto,
+  });
+
+  return { data, error };
+};
+
+export const updateComment = async (
+  commentId: string,
+  updateCommentDto: UpdateCommentDto
+) => {
+  const { data, error } = await commentsControllerUpdate({
+    path: {
+      commentId,
+    },
+    body: updateCommentDto,
+  });
+
+  return { data, error };
+};
+
+export const removeComment = async (commentId: string) => {
+  const { data, error } = await commentsControllerRemove({
+    path: {
+      commentId,
+    },
+  });
+
+  return { data, error };
+};
+
+export const getAllInstructorQuestions = async () => {
+  const { data, error } = await questionsControllerFindAllByInstructorId({});
 
   return { data, error };
 };

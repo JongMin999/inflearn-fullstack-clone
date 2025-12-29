@@ -2,7 +2,12 @@ import { auth } from "@/auth";
 import * as api from "@/lib/api";
 import UI from "./ui";
 import { redirect } from "next/navigation";
+import { Metadata } from "next";
 
+export const metadata: Metadata = {
+  title: "수강평 관리 - 인프런 | 지식공유자",
+  description: "인프런 지식공유자 수강평관리 페이지입니다.",
+};
 export default async function InstructorReviewsPage() {
   const session = await auth();
   
