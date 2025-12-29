@@ -9,11 +9,12 @@ import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getLevelText } from "@/lib/level";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as api from "@/lib/api";
 import { User } from "next-auth";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+import { toast } from "sonner";
 
 interface CourseCardProps {
   user?: User;
@@ -22,6 +23,7 @@ interface CourseCardProps {
 
 export default function CourseCard({ user, course }: CourseCardProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [isHovered, setIsHovered] = useState(false);
   
   const getMyFavoritesQuery = useQuery({
@@ -71,10 +73,24 @@ export default function CourseCard({ user, course }: CourseCardProps) {
   const isFavoriteDisabled =
     addFavoriteMutation.isPending || removeFavoriteMutation.isPending;
 
+  const addToCartMutation = useMutation({
+      mutationFn: () => api.addToCart(course.id),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["cart-items"] });
+        toast.success(`"${course.title}"이(가) 장바구니에 담겼습니다.`);
+      },
+    });
+
   const handleCartClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    alert("구현 예정");
+    
+    if (!user) {
+      alert("로그인 후 이용해주세요.");
+      return;
+    }
+
+    addToCartMutation.mutate();
   };
 
   const formatPrice = (price: number) => {
@@ -108,32 +124,6 @@ export default function CourseCard({ user, course }: CourseCardProps) {
             <span className="text-gray-400 text-sm font-medium">이미지 없음</span>
           </div>
         )}
-
-        {/* 호버 시 보이는 액션 버튼들 */}
-        <div className="absolute right-2 top-2 flex gap-2 opacity-0 transition-opacity duration-300 group-hover:opacity-100 z-10">
-          <Button
-            size="sm"
-            variant="secondary"
-            className="h-8 w-8 p-0"
-            onClick={handleFavoriteClick}
-          >
-             <HeartIcon
-              className={cn(
-                "size-4 transition-colors",
-                isFavorite ? "fill-red-500 text-red-500" : "text-gray-500",
-                isFavoriteDisabled && "cursor-not-allowed"
-              )}
-            />
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            className="h-8 w-8 p-0"
-            onClick={handleCartClick}
-          >
-            <ShoppingCart className="h-4 w-4" />
-          </Button>
-        </div>
       </div>
 
       {/* 기본 강의 정보 */}

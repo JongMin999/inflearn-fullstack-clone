@@ -148,6 +148,7 @@ function ReviewModal({
   const [rating, setRating] = useState(0);
   const [content, setContent] = useState("");
   const router = useRouter();
+  
 
   useEffect(() => {
     if (isOpen) {
@@ -871,9 +872,36 @@ function FloatingMenu({
     enabled: true, // 항상 활성화
   });
 
+  const cartItemsQuery = useQuery({
+    queryKey: ["cart-items"],
+    queryFn: () => api.getCartItems(),
+  });
+
+  const addToCartMutation = useMutation({
+    mutationFn: () => api.addToCart(course.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cart-items"] });
+      toast.success(`"${course.title}"이(가) 장바구니에 담겼습니다.`);
+    },
+  });
+
   const handleCart = useCallback(() => {
-    alert("장바구니 기능은 준비 중입니다.");
-  }, []);
+    if (!user) {
+      alert("로그인 후 이용해주세요.");
+      return;
+    }
+
+    if (
+      cartItemsQuery.data?.data?.items?.some(
+        (item) => item.courseId === course.id
+      )
+    ) {
+      // 이미 장바구니에 있다면 장바구니 페이지로 이동
+      router.push("/carts");
+    } else {
+      addToCartMutation.mutate();
+    }
+  }, [user, cartItemsQuery.data, course.title, router]);
   
   const addFavoriteMutation = useMutation({
     mutationFn: () => api.addFavorite(course.id),
@@ -999,7 +1027,11 @@ function FloatingMenu({
               onClick={handleCart}
               className="cursor-pointer w-full py-2 px-4 rounded-md border font-medium"
             >
-              바구니에 담기
+              {cartItemsQuery.data?.data?.items?.some(
+                (item) => item.courseId === course.id
+              )
+                ? "수강 바구니로 이동"
+                : "바구니에 담기"}
             </button>
             <button
               onClick={handleFavorite}
@@ -1075,10 +1107,17 @@ function FloatingMenu({
   );
 }
 
-function MobileBottomBar({ course }: { course: CourseDetailDto }) {
-  const handleCart = () => {
-    alert("장바구니 기능은 준비 중입니다.");
-  };
+function MobileBottomBar({
+  course,
+  user,
+  isInCart,
+  onCartClick,
+}: {
+  course: CourseDetailDto;
+  user?: User;
+  isInCart: boolean;
+  onCartClick: () => void;
+}) {
   return (
     <div className="lg:hidden fixed bottom-0 inset-x-0 border-t bg-white flex items-center gap-4 px-4 py-3 z-50 shadow">
       <div className="flex-1">
@@ -1101,9 +1140,9 @@ function MobileBottomBar({ course }: { course: CourseDetailDto }) {
         수강신청
       </button>
       <button
-        onClick={handleCart}
+        onClick={onCartClick}
         className="p-2 rounded-md border font-medium"
-        aria-label="장바구니에 담기"
+        aria-label={isInCart ? "수강 바구니로 이동" : "장바구니에 담기"}
       >
         <ShoppingCartIcon className="size-5" />
       </button>
@@ -1142,7 +1181,12 @@ export default function CourseDetailUI({
       </div>
 
       {/* 모바일 하단 바 */}
-      <MobileBottomBar course={course} />
+      <MobileBottomBar
+        course={course}
+        user={user}
+        isInCart={false} // TODO: 실제 장바구니 상태로 대체
+        onCartClick={() => alert("모바일 장바구니 기능 준비 중")}
+      />
     </div>
   );
 }
