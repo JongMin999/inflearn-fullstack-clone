@@ -158,6 +158,28 @@ import { UpdateLectureActivityDto } from './dto/update-lecture-activity.dto';
         throw new NotFoundException('강의를 찾을 수 없습니다.');
       }
 
+      // 기존 활동 정보 조회 (최대값 유지를 위해)
+      const existingActivity = await this.prisma.lectureActivity.findUnique({
+        where: {
+          userId_courseId_lectureId: {
+            userId,
+            courseId: lecture.courseId,
+            lectureId,
+          },
+        },
+      });
+
+      // duration은 누적 최대값으로 유지 (같은 강의를 다시 봐도 초기화되지 않음)
+      const maxDuration = existingActivity
+        ? Math.max(existingActivity.duration, updateLectureActivityDto.duration)
+        : updateLectureActivityDto.duration;
+
+      // progress는 현재 시청 위치 (0-100)
+      const currentProgress = updateLectureActivityDto.progress;
+
+      // isCompleted는 한번 true가 되면 false로 되돌아가지 않음 (최대값 유지)
+      const isCompleted = existingActivity?.isCompleted || updateLectureActivityDto.isCompleted || false;
+
       const result = await this.prisma.lectureActivity.upsert({
         where: {
           userId_courseId_lectureId: {
@@ -170,15 +192,15 @@ import { UpdateLectureActivityDto } from './dto/update-lecture-activity.dto';
           userId,
           courseId: lecture.courseId,
           lectureId,
-          progress: updateLectureActivityDto.progress,
-          duration: updateLectureActivityDto.duration,
-          isCompleted: updateLectureActivityDto.isCompleted,
+          progress: currentProgress,
+          duration: maxDuration,
+          isCompleted: isCompleted,
           lastWatchedAt: updateLectureActivityDto.lastWatchedAt,
         },
         update: {
-          progress: updateLectureActivityDto.progress,
-          duration: updateLectureActivityDto.duration,
-          isCompleted: updateLectureActivityDto.isCompleted,
+          progress: currentProgress,
+          duration: maxDuration, // 최대값 유지
+          isCompleted: isCompleted, // 한번 true면 false로 되돌아가지 않음
           lastWatchedAt: updateLectureActivityDto.lastWatchedAt,
         },
       });

@@ -136,12 +136,138 @@ export class CoursesService {
       },
     });
 
-    return this.prisma.course.findMany({
+    const courseIds = enrollments.map((enrollment) => enrollment.courseId);
+
+    const courses = await this.prisma.course.findMany({
       where: {
         id: {
-          in: enrollments.map((enrollment) => enrollment.courseId),
+          in: courseIds,
+        },
+        // 자신이 강사인 강의는 제외
+        instructorId: {
+          not: userId,
         },
       },
+      include: {
+        sections: {
+          include: {
+            lectures: {
+              select: {
+                id: true,
+                duration: true,
+              },
+            },
+          },
+          orderBy: {
+            order: 'asc',
+          },
+        },
+        instructor: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    // 각 강의별 lectureActivities 가져오기
+    const lectureActivities = await this.prisma.lectureActivity.findMany({
+      where: {
+        userId,
+        courseId: {
+          in: courseIds,
+        },
+      },
+    });
+
+    // 각 강의별 수강평 존재 여부 한 번에 조회
+    const courseReviews = await this.prisma.courseReview.findMany({
+      where: {
+        userId,
+        courseId: {
+          in: courseIds,
+        },
+      },
+      select: {
+        courseId: true,
+      },
+    });
+
+    // 강의별로 lectureActivities 그룹화
+    const activitiesByCourse = lectureActivities.reduce((acc, activity) => {
+      if (!acc[activity.courseId]) {
+        acc[activity.courseId] = [];
+      }
+      acc[activity.courseId].push(activity);
+      return acc;
+    }, {} as Record<string, typeof lectureActivities>);
+
+    // 강의별 수강평 존재 여부 맵 생성
+    const reviewExistsMap = new Set(courseReviews.map((review) => review.courseId));
+
+    // 강의에 진행률 정보 추가
+    return courses.map((course) => {
+      const activities = activitiesByCourse[course.id] || [];
+      
+      // 모든 강의를 평탄화 (섹션 구분 없이)
+      const allLectures = course.sections.flatMap((section) => section.lectures);
+
+      // 전체 강의 수 계산 (표시용)
+      const totalLectures = allLectures.length;
+
+      // 완료한 강의 수 계산 (isCompleted === true)
+      const completedLectures = activities.filter(
+        (activity) => activity.isCompleted,
+      ).length;
+
+      // 전체 영상 길이 합 (초 단위) - 모든 강의의 duration 합산
+      const totalDuration = allLectures.reduce(
+        (sum, lecture) => sum + (lecture.duration || 0),
+        0,
+      );
+
+      // 들은 영상 길이 합 (초 단위) - 영상 길이 기준으로만 계산
+      // activity.duration은 누적 최대 시청 시간(초)
+      const watchedDuration = activities.reduce((sum, activity) => {
+        const lecture = allLectures.find((l) => l.id === activity.lectureId);
+        
+        if (!lecture || !lecture.duration) return sum;
+        
+        if (activity.isCompleted) {
+          // 완료한 강의는 전체 duration 사용
+          return sum + lecture.duration;
+        }
+        // 완료하지 않은 강의는 실제 시청한 시간(duration) 사용
+        // activity.duration은 누적 최대 시청 시간(초)이므로 그대로 사용
+        const watchedTime = activity.duration;
+        
+        // 강의 전체 길이를 넘지 않도록 제한
+        const clampedWatchedTime = Math.min(watchedTime, lecture.duration || 0);
+        return sum + clampedWatchedTime;
+      }, 0);
+
+      // 진행률 계산 (0-100) - 완료한 강의 수 / 전체 강의 수
+      // 소수점 2자리까지 정확하게 계산 (예: 1/3 = 33.33%)
+      const progressPercentage =
+        totalLectures > 0
+          ? Math.min(100, Math.round((completedLectures / totalLectures) * 10000) / 100) // 소수점 2자리까지
+          : 0;
+
+      // Prisma 객체를 일반 객체로 변환하여 progress 필드 추가
+      const courseWithProgress = {
+        ...JSON.parse(JSON.stringify(course)),
+        progress: {
+          completedLectures,
+          totalLectures,
+          watchedDuration,
+          totalDuration,
+          progressPercentage,
+        },
+        myReviewExists: reviewExistsMap.has(course.id),
+      };
+      
+      return courseWithProgress as any;
     });
   }
 
@@ -828,9 +954,28 @@ export class CoursesService {
 
       const course = await this.prisma.course.findUnique({
         where: { id: courseId },
-        select: { instructorId: true },
+        select: {
+          instructorId: true,
+          price: true,
+          discountPrice: true,
+        },
       });
 
+      if (!course) {
+        throw new NotFoundException('강의를 찾을 수 없습니다.');
+      }
+
+      // 강의 가격 확인
+      const finalPrice = course.discountPrice || course.price;
+
+      // 0원이 아닌 경우 결제가 필요함을 알림
+      if (finalPrice > 0) {
+        throw new BadRequestException(
+          '유료 강의는 결제가 필요합니다. 결제 페이지로 이동해주세요.',
+        );
+      }
+
+      // 0원 강의는 바로 수강신청 처리
       await this.prisma.courseEnrollment.create({
         data: {
           userId,
@@ -842,16 +987,59 @@ export class CoursesService {
       // 인기순 캐시 무효화 (수강생 수 변경)
       await this.invalidateCourseListCache();
       // 강사 통계 캐시 무효화
-      if (course) {
-        await this.invalidateInstructorStatsCache(course.instructorId);
-      }
+      await this.invalidateInstructorStatsCache(course.instructorId);
 
       return true;
     } catch (err) {
-      if (err instanceof ConflictException) {
+      if (
+        err instanceof ConflictException ||
+        err instanceof NotFoundException ||
+        err instanceof BadRequestException
+      ) {
         throw err;
       }
       throw new Error('수강신청 중 오류가 발생했습니다.');
+    }
+  }
+
+  async unenrollCourse(courseId: string, userId: string): Promise<boolean> {
+    try {
+      const existingEnrollment = await this.prisma.courseEnrollment.findFirst({
+        where: {
+          userId,
+          courseId,
+        },
+        include: {
+          course: {
+            select: {
+              instructorId: true,
+            },
+          },
+        },
+      });
+
+      if (!existingEnrollment) {
+        throw new NotFoundException('수강신청 내역을 찾을 수 없습니다.');
+      }
+
+      // 수강신청 삭제
+      await this.prisma.courseEnrollment.delete({
+        where: {
+          id: existingEnrollment.id,
+        },
+      });
+
+      // 인기순 캐시 무효화 (수강생 수 변경)
+      await this.invalidateCourseListCache();
+      // 강사 통계 캐시 무효화
+      await this.invalidateInstructorStatsCache(existingEnrollment.course.instructorId);
+
+      return true;
+    } catch (err) {
+      if (err instanceof NotFoundException) {
+        throw err;
+      }
+      throw new Error('수강취소 중 오류가 발생했습니다.');
     }
   }
 
@@ -980,6 +1168,13 @@ export class CoursesService {
       throw new NotFoundException('코스를 찾을 수 없습니다.');
     }
 
+    // 자신이 강사인 강의에는 리뷰를 작성할 수 없음
+    if (course.instructorId === userId) {
+      throw new UnauthorizedException(
+        '자신이 만든 강의에는 수강평을 작성할 수 없습니다.',
+      );
+    }
+
     const enrollment = await this.prisma.courseEnrollment.findUnique({
       where: {
         userId_courseId: {
@@ -991,7 +1186,7 @@ export class CoursesService {
 
     if (!enrollment) {
       throw new UnauthorizedException(
-        '수강신청한 강의만 리뷰를 작성하실 수 있습니다.',
+        '수강신청을 한 사람만 강의평을 작성할 수 있습니다.',
       );
     }
 

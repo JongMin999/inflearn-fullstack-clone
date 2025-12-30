@@ -212,6 +212,17 @@ getMyFavorites(@Req() req: Request) {
   enrollCourse(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string) {
     return this.coursesService.enrollCourse(id, req.user.sub);
   }
+
+  @Delete(':id/enroll')
+  @UseGuards(AccessTokenGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOkResponse({ 
+    description: '수강취소',
+    type: Boolean 
+  })
+  unenrollCourse(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string) {
+    return this.coursesService.unenrollCourse(id, req.user.sub);
+  }
   
   @Get(':courseId/activity')
   @UseGuards(AccessTokenGuard)

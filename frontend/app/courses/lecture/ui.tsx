@@ -122,6 +122,7 @@ function Sidebar({
   course,
   onClose,
   user,
+  lectureActivities,
 }: {
   sections: SectionEntity[];
   currentLectureId?: string;
@@ -129,7 +130,17 @@ function Sidebar({
   course: CourseDetailDto;
   onClose: () => void;
   user?: User;
+  lectureActivities: LectureActivityEntity[];
 }) {
+  // 모든 강의를 평탄화
+  const allLectures = sections.flatMap((section) => section.lectures);
+  const totalLectures = allLectures.length;
+  const completedLectures = lectureActivities.filter(
+    (activity) => activity.isCompleted
+  ).length;
+  const progressPercentage = totalLectures > 0 
+    ? Math.round((completedLectures / totalLectures) * 100 * 100) / 100 
+    : 0;
   return (
     <aside className="hidden lg:flex flex-col w-80 h-screen bg-white border-l shadow-lg">
       {/* Header */}
@@ -153,6 +164,17 @@ function Sidebar({
           <TabsTrigger value="qa">질문&답변</TabsTrigger>
         </TabsList>
 
+        {/* 진도율 표시 */}
+        <div className="px-4 py-3 mb-2 bg-muted/50 rounded-md">
+          <div className="flex items-center justify-between text-sm mb-2">
+            <span className="font-medium">진도율</span>
+            <span className="text-muted-foreground">
+              {completedLectures} / {totalLectures} {progressPercentage.toFixed(2)}%
+            </span>
+          </div>
+          <Progress value={progressPercentage} className="h-2" />
+        </div>
+
         <TabsContent value="curriculum" className="flex-1 overflow-y-auto mt-0">
           <Accordion type="multiple" className="w-full">
             {sections.map((section) => (
@@ -173,17 +195,20 @@ function Sidebar({
                   <div className="flex flex-col">
                     {section.lectures
                       .sort((a, b) => a.order - b.order)
-                      .map((lecture) => (
-                        <LectureRow
-                          key={lecture.id}
-                          lecture={lecture}
-                          isActive={lecture.id === currentLectureId}
-                          onSelect={() => onSelectLecture(lecture)}
-                          completed={
-                            false /* TODO: replace with real progress */
-                          }
-                        />
-                      ))}
+                      .map((lecture) => {
+                        const activity = lectureActivities.find(
+                          (a) => a.lectureId === lecture.id
+                        );
+                        return (
+                          <LectureRow
+                            key={lecture.id}
+                            lecture={lecture}
+                            isActive={lecture.id === currentLectureId}
+                            onSelect={() => onSelectLecture(lecture)}
+                            completed={activity?.isCompleted || false}
+                          />
+                        );
+                      })}
                   </div>
                 </AccordionContent>
               </AccordionItem>
@@ -504,7 +529,17 @@ function VideoPlayer({
   }
 
   return (
-    <div ref={wrapperRef} className="relative flex-1 h-full bg-black">
+    <div 
+      ref={wrapperRef} 
+      className="relative flex-1 h-full bg-black cursor-pointer"
+      onClick={(e) => {
+        // 컨트롤 영역이나 버튼 클릭이 아닌 경우에만 재생/일시정지
+        const target = e.target as HTMLElement;
+        if (!target.closest('button') && !target.closest('.controls-area')) {
+          handlePlayPause();
+        }
+      }}
+    >
       {/* ReactPlayer maintains 16:9 responsiveness by padding */}
       <ReactPlayer
         ref={playerRef}
@@ -547,7 +582,7 @@ function VideoPlayer({
 
       {/* Lecture title overlay */}
       <div className="absolute top-2 left-2 flex items-center z-10">
-        <button className="cursor-pointer" onClick={() => router.back()}>
+        <button className="cursor-pointer" onClick={() => router.push("/my/courses")}>
           <ArrowLeftIcon color="white" size={20} />
         </button>
         <span className="text-sm md:text-base font-semibold text-white bg-black/60 px-3 py-1 rounded-md">
@@ -556,7 +591,7 @@ function VideoPlayer({
       </div>
 
       {/* Controls */}
-      <div className="absolute bottom-0 left-0 right-0 px-4 pb-3 pt-2 bg-black/70 backdrop-blur flex flex-col gap-2 text-white z-10 overflow-visible">
+      <div className="controls-area absolute bottom-0 left-0 right-0 px-4 pb-3 pt-2 bg-black/70 backdrop-blur flex flex-col gap-2 text-white z-10 overflow-visible">
         {/* progress slider */}
         <Slider
           min={0}
@@ -715,11 +750,15 @@ export default function UI({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const currentLectureId = lectureId ?? course.sections[0].lectures[0].id;
-
+  
   const allLectures = useMemo(() => {
-    return course.sections.flatMap((section) => section.lectures);
+    if (!course.sections || course.sections.length === 0) {
+      return [];
+    }
+    return course.sections.flatMap((section) => section.lectures || []);
   }, [course.sections]);
+
+  const currentLectureId = lectureId ?? allLectures[0]?.id;
 
   const currentLecture = useMemo(() => {
     if (currentLectureId) {
@@ -729,6 +768,28 @@ export default function UI({
     // fallback to first lecture
     return allLectures[0];
 }, [currentLectureId, allLectures]);
+
+  // 강의가 없는 경우 처리
+  if (!currentLecture || allLectures.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-lg font-medium text-gray-900 mb-2">
+            강의가 없습니다
+          </p>
+          <p className="text-sm text-gray-500 mb-4">
+            이 강의에는 아직 등록된 강의가 없습니다.
+          </p>
+          <button
+            onClick={() => router.push(`/course/${course.id}`)}
+            className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90"
+          >
+            강의 상세로 돌아가기
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const handleSelectLecture = (lecture: LectureEntity) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -778,6 +839,7 @@ export default function UI({
           course={course}
           onClose={() => setSidebarOpen(false)}
           user={user}
+          lectureActivities={lectureActivities}
         />
       )}
     </div>

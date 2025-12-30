@@ -6,6 +6,14 @@ import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Trash2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -31,6 +39,15 @@ export default function CartUI() {
 
   const [isPaymentProcessing, setIsPaymentProcessing] = useState(false);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [errorDialog, setErrorDialog] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+  }>({
+    open: false,
+    title: "",
+    message: "",
+  });
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("ko-KR").format(price);
@@ -109,9 +126,29 @@ export default function CartUI() {
     },
   });
 
+  // 이메일 형식 검증
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // 전화번호 형식 검증 (숫자만 허용)
+  const validatePhone = (phone: string): boolean => {
+    const phoneRegex = /^[0-9]+$/;
+    return phoneRegex.test(phone);
+  };
+
+  const showErrorDialog = (title: string, message: string) => {
+    setErrorDialog({
+      open: true,
+      title,
+      message,
+    });
+  };
+
   const handlePayment = async () => {
     if (selectedItems.length === 0) {
-      alert("결제할 강의를 선택해주세요");
+      showErrorDialog("오류", "결제할 강의를 선택해주세요");
       return;
     }
     if (
@@ -119,9 +156,22 @@ export default function CartUI() {
       !customerInfo.customerName ||
       !customerInfo.customerPhone
     ) {
-      alert("구매자 정보를 모두 입력해주세요.");
+      showErrorDialog("오류", "구매자 정보를 모두 입력해주세요.");
       return;
     }
+
+    // 이메일 형식 검증
+    if (!validateEmail(customerInfo.customerEmail)) {
+      showErrorDialog("오류", "이메일 형식이 다릅니다.");
+      return;
+    }
+
+    // 전화번호 형식 검증
+    if (!validatePhone(customerInfo.customerPhone)) {
+      showErrorDialog("오류", "전화번호 형식이 다릅니다.");
+      return;
+    }
+
     setIsPaymentProcessing(true);
 
     try {
@@ -133,6 +183,36 @@ export default function CartUI() {
               selectedCartItems.length - 1
             }개`;
 
+      // 0원 결제는 PortOne 결제 창을 띄우지 않고 바로 수강신청 처리
+      if (selectedTotalDiscountPrice === 0) {
+        try {
+          // 선택된 모든 강의를 수강신청
+          await Promise.all(
+            selectedCartItems.map((item) => api.enrollCourse(item.courseId))
+          );
+
+          // 장바구니에서 선택된 아이템 제거
+          await Promise.all(
+            selectedCartItems.map((item) =>
+              api.removeFromCart(item.courseId)
+            )
+          );
+
+          toast.success("수강신청이 완료되었습니다!");
+          queryClient.invalidateQueries({ queryKey: ["cart-items"] });
+          router.push("/my/courses");
+        } catch (error: any) {
+          console.error("0원 결제 처리 오류", error);
+          toast.error(
+            error?.message || "수강신청 중 오류가 발생했습니다. 다시 시도해주세요."
+          );
+        } finally {
+          setIsPaymentProcessing(false);
+        }
+        return;
+      }
+
+      // 유료 결제는 PortOne 결제 창 띄우기
       const payment = await PortOne.requestPayment({
         storeId: process.env.NEXT_PUBLIC_PORTONE_STORE_ID || "store-test",
         channelKey:
@@ -157,7 +237,11 @@ export default function CartUI() {
       });
 
       if (!payment || payment.code !== undefined) {
-        alert(`결제 실패: ${payment?.message || "알 수 없는 오류"}`);
+        showErrorDialog(
+          "결제 실패",
+          payment?.message || "알 수 없는 오류가 발생했습니다."
+        );
+        setIsPaymentProcessing(false);
         return;
       }
 
@@ -170,11 +254,17 @@ export default function CartUI() {
         queryClient.invalidateQueries({ queryKey: ["cart-items"] });
         router.push("/my/courses");
       } else {
-        alert(`결제 검증 실패: ${(result.data as any)["message"]}`);
+        showErrorDialog(
+          "결제 검증 실패",
+          (result.data as any)["message"] || "결제 검증에 실패했습니다."
+        );
       }
     } catch (error) {
       console.error("결제 오류", error);
-      alert("결제 중 오류가 발생했습니다. 다시 시도해주세요.");
+      showErrorDialog(
+        "오류",
+        "결제 중 오류가 발생했습니다. 다시 시도해주세요."
+      );
     } finally {
       setIsPaymentProcessing(false);
     }
@@ -231,10 +321,14 @@ export default function CartUI() {
                 type="checkbox"
                 checked={selectedItems.includes(item.id)}
                 onChange={() => handleSelectItem(item.id)}
+                onClick={(e) => e.stopPropagation()}
                 className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
               />
 
-              <div className="relative w-24 h-16 flex-shrink-0">
+              <div 
+                className="relative w-24 h-16 flex-shrink-0 cursor-pointer"
+                onClick={() => router.push(`/course/${item.course.id}`)}
+              >
                 <Image
                   src={item.course.thumbnailUrl || "/placeholder-course.jpg"}
                   alt={item.course.title}
@@ -243,16 +337,19 @@ export default function CartUI() {
                 />
               </div>
 
-              <div className="flex-1 min-w-0">
+              <div 
+                className="flex-1 min-w-0 cursor-pointer"
+                onClick={() => router.push(`/course/${item.course.id}`)}
+              >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <h3 className="font-medium text-sm mb-1 line-clamp-2">
+                    <h3 className="font-medium text-sm mb-1 line-clamp-2 hover:text-primary">
                       {item.course.title}
                     </h3>
                     <p className="text-xs text-gray-500 mb-1">
                       로드맵 · 무제한 수강
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-gray-500 hover:text-primary">
                       {item.course.instructor.name}
                     </p>
                   </div>
@@ -270,16 +367,20 @@ export default function CartUI() {
                           </span>
                         )}
                       <button
-                        onClick={() =>
-                          removeFromCartMutation.mutate(item.courseId)
-                        }
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeFromCartMutation.mutate(item.courseId);
+                        }}
                         className="p-1 text-gray-400 hover:text-red-500"
                       >
                         <Trash2Icon className="w-4 h-4" />
                       </button>
                     </div>
 
-                    <div className="text-right">
+                    <div 
+                      className="text-right"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {item.course.discountPrice &&
                       item.course.discountPrice < item.course.price ? (
                         <>
@@ -355,14 +456,16 @@ export default function CartUI() {
                   <Input
                     id="customerPhone"
                     type="tel"
-                    placeholder="휴대폰 번호 입력"
+                    placeholder="휴대폰 번호 입력 (숫자만)"
                     value={customerInfo.customerPhone}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      // 숫자만 입력 허용
+                      const value = e.target.value.replace(/[^0-9]/g, "");
                       setCustomerInfo({
                         ...customerInfo,
-                        customerPhone: e.target.value,
-                      })
-                    }
+                        customerPhone: value,
+                      });
+                    }}
                     className="flex-1"
                   />
                 </div>
@@ -422,6 +525,25 @@ export default function CartUI() {
           </div>
         </div>
       </div>
+
+      {/* 오류 다이얼로그 */}
+      <Dialog open={errorDialog.open} onOpenChange={(open) => 
+        setErrorDialog({ ...errorDialog, open })
+      } modal={false}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{errorDialog.title}</DialogTitle>
+            <DialogDescription>
+              {errorDialog.message}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setErrorDialog({ ...errorDialog, open: false })}>
+              확인
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -54,19 +54,62 @@ export default function CourseCard({ user, course }: CourseCardProps) {
     }
   };
 
+  const [optimisticFavoriteCount, setOptimisticFavoriteCount] = useState<number | null>(null);
+  const currentFavoriteCount = optimisticFavoriteCount !== null 
+    ? optimisticFavoriteCount 
+    : ((course as any)._count?.favorites ?? 0);
+
   const addFavoriteMutation = useMutation({
-    mutationFn: () => api.addFavorite(course.id),
-    onSuccess: () => {
+    mutationFn: async () => {
+      await api.addFavorite(course.id);
+      // 좋아요 추가 후 실제 카운트 가져오기
+      const favoriteResponse = await api.getFavorite(course.id);
+      return favoriteResponse.data?.favoriteCount ?? currentFavoriteCount + 1;
+    },
+    onMutate: () => {
+      // Optimistic update: 좋아요 숫자 즉시 증가
+      setOptimisticFavoriteCount(currentFavoriteCount + 1);
+    },
+    onSuccess: (actualCount) => {
+      // 서버에서 가져온 실제 카운트로 업데이트
+      setOptimisticFavoriteCount(actualCount);
       getMyFavoritesQuery.refetch();
+      // course list query invalidate하여 전체 목록 업데이트
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      queryClient.invalidateQueries({ queryKey: ["search-courses"] });
+      // 강의 상세페이지 좋아요 쿼리도 invalidate
+      queryClient.invalidateQueries({ queryKey: ["favorite", course.id] });
+    },
+    onError: () => {
+      // 에러 발생 시 원래 값으로 복구
+      setOptimisticFavoriteCount(null);
     },
   });
 
   const removeFavoriteMutation = useMutation({
-    mutationFn: () => {
-      return api.removeFavorite(course.id);
+    mutationFn: async () => {
+      await api.removeFavorite(course.id);
+      // 좋아요 제거 후 실제 카운트 가져오기
+      const favoriteResponse = await api.getFavorite(course.id);
+      return favoriteResponse.data?.favoriteCount ?? Math.max(0, currentFavoriteCount - 1);
     },
-    onSuccess: () => {
+    onMutate: () => {
+      // Optimistic update: 좋아요 숫자 즉시 감소
+      setOptimisticFavoriteCount(Math.max(0, currentFavoriteCount - 1));
+    },
+    onSuccess: (actualCount) => {
+      // 서버에서 가져온 실제 카운트로 업데이트
+      setOptimisticFavoriteCount(actualCount);
       getMyFavoritesQuery.refetch();
+      // course list query invalidate하여 전체 목록 업데이트
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      queryClient.invalidateQueries({ queryKey: ["search-courses"] });
+      // 강의 상세페이지 좋아요 쿼리도 invalidate
+      queryClient.invalidateQueries({ queryKey: ["favorite", course.id] });
+    },
+    onError: () => {
+      // 에러 발생 시 원래 값으로 복구
+      setOptimisticFavoriteCount(null);
     },
   });
 
@@ -286,7 +329,7 @@ export default function CourseCard({ user, course }: CourseCardProps) {
                 )}
               />
               <span className="text-xs">
-                {(course as any)._count?.favorites ?? 0}
+                {currentFavoriteCount.toLocaleString()}
               </span>
             </Button>
             <Button

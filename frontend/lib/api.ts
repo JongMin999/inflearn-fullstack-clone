@@ -323,6 +323,49 @@ export const enrollCourse = async (courseId: string) => {
   return { data, error };
 };
 
+export const unenrollCourse = async (courseId: string) => {
+  // OpenAPI 클라이언트가 생성될 때까지 직접 fetch 사용
+  try {
+    const { auth } = await import("@/auth");
+    const session = await auth();
+    
+    if (!session?.user?.id) {
+      return { data: null, error: '로그인이 필요합니다.' };
+    }
+
+    // JWT 토큰 생성
+    const jwt = await import("jsonwebtoken");
+    const token = jwt.sign(
+      {
+        sub: session.user.id,
+        email: session.user.email,
+        name: session.user.name,
+      },
+      process.env.AUTH_SECRET!,
+      { expiresIn: "1h" }
+    );
+
+    const API_URL = process.env.API_URL || "http://localhost:8000";
+    const response = await fetch(`${API_URL}/courses/${courseId}/enroll`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: '수강취소 중 오류가 발생했습니다.' }));
+      return { data: null, error: errorData.message || '수강취소 중 오류가 발생했습니다.' };
+    }
+
+    const data = await response.json();
+    return { data, error: null };
+  } catch (err) {
+    return { data: null, error: err instanceof Error ? err.message : '수강취소 중 오류가 발생했습니다.' };
+  }
+};
+
 export const updateLectureActivity = async (
   lectureId: string,
   updateLectureActivityDto: UpdateLectureActivityDto

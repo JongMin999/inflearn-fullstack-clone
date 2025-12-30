@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import UI from "./ui";
 import * as api from "@/lib/api";
+import { auth } from "@/auth";
 
 export const metadata: Metadata = {
   title: "내 학습 - 인프런",
@@ -8,7 +9,8 @@ export const metadata: Metadata = {
 };
 
 export default async function MyCoursesPage() {
+  const session = await auth();
   const myCoursesResponse = await api.getAllMyCourses();
 
-  return <UI courses={myCoursesResponse.data || []} />;
+  return <UI courses={myCoursesResponse.data || []} userId={session?.user?.id} />;
 }

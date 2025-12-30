@@ -91,15 +91,27 @@ export default function UI({ courses }: { courses: Course[] }) {
               return (
                 <TableRow key={course.id}>
                   <TableCell>
-                    <Image
-                      src={course.thumbnailUrl || "/logo/inflearn.png"}
-                      alt={course.title}
-                      width={80}
-                      height={80}
-                      className="rounded bg-white border object-contain"
-                    />
+                    <div
+                      className="cursor-pointer"
+                      onClick={() => router.push(`/course/${course.id}`)}
+                    >
+                      <Image
+                        src={course.thumbnailUrl || "/logo/inflearn.png"}
+                        alt={course.title}
+                        width={80}
+                        height={80}
+                        className="rounded bg-white border object-contain"
+                      />
+                    </div>
                   </TableCell>
-                  <TableCell>{course.title}</TableCell>
+                  <TableCell>
+                    <span
+                      className="cursor-pointer hover:text-primary"
+                      onClick={() => router.push(`/course/${course.id}`)}
+                    >
+                      {course.title}
+                    </span>
+                  </TableCell>
                   <TableCell>{avgRating}</TableCell>
                   <TableCell>{totalStudents}</TableCell>
                   <TableCell>{totalQuestions}</TableCell>

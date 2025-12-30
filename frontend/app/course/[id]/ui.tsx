@@ -41,6 +41,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useRouter } from "next/navigation";
+import PortOne from "@portone/browser-sdk/v2";
 
 /*****************
  * Helper Utils  *
@@ -863,6 +864,7 @@ function FloatingMenu({
 }) {
   const [isEnrolled, setIsEnrolled] = useState(course.isEnrolled);
   const [showEnrollSuccessDialog, setShowEnrollSuccessDialog] = useState(false);
+  const [isPaymentProcessing, setIsPaymentProcessing] = useState(false);
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -904,22 +906,36 @@ function FloatingMenu({
   }, [user, cartItemsQuery.data, course.title, router]);
   
   const addFavoriteMutation = useMutation({
-    mutationFn: () => api.addFavorite(course.id),
-    onSuccess: () => {
-      // 좋아요 쿼리 즉시 무효화 및 재조회
-      queryClient.invalidateQueries({ queryKey: ["favorite", course.id] });
-      getFavoriteQuery.refetch();
+    mutationFn: async () => {
+      await api.addFavorite(course.id);
+      // 좋아요 추가 후 실제 카운트 가져오기
+      const favoriteResponse = await api.getFavorite(course.id);
+      return favoriteResponse.data;
+    },
+    onSuccess: (favoriteData) => {
+      // 서버에서 가져온 실제 데이터로 쿼리 업데이트
+      queryClient.setQueryData(["favorite", course.id], { data: favoriteData });
+      // course list query도 invalidate하여 썸네일 업데이트
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      queryClient.invalidateQueries({ queryKey: ["search-courses"] });
+      queryClient.invalidateQueries({ queryKey: ["my-favorites"] });
     },
   });
 
   const removeFavoriteMutation = useMutation({
-    mutationFn: () => {
-      return api.removeFavorite(course.id);
+    mutationFn: async () => {
+      await api.removeFavorite(course.id);
+      // 좋아요 제거 후 실제 카운트 가져오기
+      const favoriteResponse = await api.getFavorite(course.id);
+      return favoriteResponse.data;
     },
-    onSuccess: () => {
-      // 좋아요 쿼리 즉시 무효화 및 재조회
-      queryClient.invalidateQueries({ queryKey: ["favorite", course.id] });
-      getFavoriteQuery.refetch();
+    onSuccess: (favoriteData) => {
+      // 서버에서 가져온 실제 데이터로 쿼리 업데이트
+      queryClient.setQueryData(["favorite", course.id], { data: favoriteData });
+      // course list query도 invalidate하여 썸네일 업데이트
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      queryClient.invalidateQueries({ queryKey: ["search-courses"] });
+      queryClient.invalidateQueries({ queryKey: ["my-favorites"] });
     },
   });
 
@@ -950,7 +966,83 @@ function FloatingMenu({
     },
   });
 
-  const handleEnroll = useCallback(() => {
+  const generatePaymentId = () =>
+    `order_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+  const handlePayment = useCallback(async () => {
+    if (!user) {
+      alert("로그인 후 이용해주세요.");
+      return;
+    }
+
+    // user.email과 user.name이 없으면 session에서 가져오거나 기본값 사용
+    const customerName = user.name || user.email?.split("@")[0] || "고객";
+    const customerEmail = user.email || "";
+    
+    if (!customerEmail) {
+      alert("이메일 정보가 필요합니다. 프로필을 먼저 설정해주세요.");
+      return;
+    }
+
+    setIsPaymentProcessing(true);
+
+    try {
+      const finalPrice = course.discountPrice || course.price;
+      const paymentId = generatePaymentId();
+
+      const payment = await PortOne.requestPayment({
+        storeId: process.env.NEXT_PUBLIC_PORTONE_STORE_ID || "store-test",
+        channelKey:
+          process.env.NEXT_PUBLIC_PORTONE_CHANNEL_KEY || "channel-test-key",
+        paymentId,
+        orderName: course.title,
+        totalAmount: finalPrice,
+        currency: "CURRENCY_KRW",
+        payMethod: "CARD",
+        customer: {
+          fullName: customerName,
+          email: customerEmail,
+          phoneNumber: "",
+        },
+        customData: {
+          items: [
+            {
+              courseId: course.id,
+              price: finalPrice,
+            },
+          ],
+          customerInfo: {
+            customerName: customerName,
+            customerEmail: customerEmail,
+            customerPhone: "",
+          },
+        },
+      });
+
+      if (!payment || payment.code !== undefined) {
+        alert(`결제 실패: ${payment?.message || "알 수 없는 오류"}`);
+        return;
+      }
+
+      const result = await api.verifyPayment({ paymentId });
+
+      if ((result.data as any)["success"]) {
+        toast.success("결제가 완료되었습니다!");
+        setIsEnrolled(true);
+        setShowEnrollSuccessDialog(true);
+        queryClient.invalidateQueries({ queryKey: ["course", course.id] });
+      } else {
+        alert(`결제 검증 실패: ${(result.data as any)["message"]}`);
+      }
+    } catch (error) {
+      console.error("결제 오류", error);
+      toast.error("결제 중 오류가 발생했습니다. 다시 시도해주세요.");
+    } finally {
+      setIsPaymentProcessing(false);
+    }
+  }, [user, course, queryClient]);
+
+  const handleEnroll = useCallback(async () => {
     if (isEnrolled) {
       alert("이미 수강신청한 강의입니다. 수강 화면으로 이동해주세요.");
       return;
@@ -961,13 +1053,22 @@ function FloatingMenu({
       return;
     }
 
-    if (course.price > 0) {
-      alert("결제는 추후 구현 예정입니다. 무료 강의를 이용해주세요.");
-      return;
-    }
+    // 무료/유료 모두 수강바구니에 담고 수강바구니 페이지로 이동
+    const isAlreadyInCart = cartItemsQuery.data?.data?.items?.some(
+      (item) => item.courseId === course.id
+    );
 
-    enrollMutation.mutate();
-  }, [course, user, enrollMutation, isEnrolled]);
+    if (!isAlreadyInCart) {
+      addToCartMutation.mutate(undefined, {
+        onSuccess: () => {
+          router.push("/carts");
+        },
+      });
+    } else {
+      // 이미 장바구니에 있으면 바로 수강바구니로 이동
+      router.push("/carts");
+    }
+  }, [course, user, isEnrolled, cartItemsQuery.data, addToCartMutation, router]);
 
   const handleStartLearning = () => {
     setShowEnrollSuccessDialog(false);
@@ -981,24 +1082,29 @@ function FloatingMenu({
         <div className="p-6 space-y-4">
           {/* 가격 */}
           <div>
-            {course.price > 0 &&
-              (course.discountPrice ? (
-                <>
-                  <span className="text-2xl font-bold text-primary">
-                    {course.discountPrice.toLocaleString()}원
-                  </span>
-                  <span className="ml-2 line-through text-muted-foreground">
-                    {course.price.toLocaleString()}원
-                  </span>
-                </>
-              ) : (
+            {(() => {
+              const finalPrice = course.discountPrice || course.price;
+              if (finalPrice === 0) {
+                return <span className="text-2xl font-bold">무료</span>;
+              }
+              if (course.discountPrice && course.discountPrice < course.price) {
+                return (
+                  <>
+                    <span className="text-2xl font-bold text-primary">
+                      {course.discountPrice.toLocaleString()}원
+                    </span>
+                    <span className="ml-2 line-through text-muted-foreground">
+                      {course.price.toLocaleString()}원
+                    </span>
+                  </>
+                );
+              }
+              return (
                 <span className="text-2xl font-bold">
                   {course.price.toLocaleString()}원
                 </span>
-              ))}
-            {course.price === 0 && (
-              <span className="text-2xl font-bold">무료</span>
-            )}
+              );
+            })()}
           </div>
           {isEnrolled ? (
             <button
@@ -1014,13 +1120,15 @@ function FloatingMenu({
             ) : (
               <button
                 onClick={handleEnroll}
-                disabled={enrollMutation.isPending}
+                disabled={enrollMutation.isPending || isPaymentProcessing}
                 className={cn(
                   "cursor-pointer w-full py-2 px-4 rounded-md bg-primary text-white font-semibold",
-                  enrollMutation.isPending && "cursor-not-allowed"
+                  (enrollMutation.isPending || isPaymentProcessing) && "cursor-not-allowed opacity-50"
                 )}
               >
-                수강신청 하기
+                {isPaymentProcessing
+                  ? "결제 진행 중..."
+                  : "수강신청"}
               </button>
             )}
            <button
@@ -1079,6 +1187,7 @@ function FloatingMenu({
       <Dialog
         open={showEnrollSuccessDialog}
         onOpenChange={setShowEnrollSuccessDialog}
+        modal={false}
       >
         <DialogContent>
           <DialogHeader>
