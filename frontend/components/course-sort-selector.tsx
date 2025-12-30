@@ -12,12 +12,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { ChevronDownIcon } from "lucide-react";
 
-type SortOption = "latest" | "popular" | "recommended";
+type SortOption = "latest" | "popular" | "recommended" | "price_low" | "price_high";
 
 const sortOptions: { value: SortOption; label: string }[] = [
   { value: "latest", label: "최신순" },
   { value: "recommended", label: "추천순" },
   { value: "popular", label: "인기순" },
+  { value: "price_low", label: "낮은 가격 순" },
+  { value: "price_high", label: "높은 가격 순" },
 ];
 
 interface CourseSortSelectorProps {
@@ -53,16 +55,16 @@ export default function CourseSortSelector({
       <DropdownMenuTrigger asChild>
         <Button
           variant="outline"
-          className="w-[120px] justify-between font-normal"
+          className="w-[140px] justify-between font-normal"
           disabled={isPending}
         >
-          <span>{currentLabel}</span>
+          <span className="truncate text-left flex-1">{currentLabel}</span>
           <ChevronDownIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent 
         align="end" 
-        className="w-[120px] p-1"
+        className="w-[140px] p-1"
         sideOffset={4}
       >
         <DropdownMenuRadioGroup
@@ -73,7 +75,7 @@ export default function CourseSortSelector({
             <DropdownMenuRadioItem 
               key={option.value} 
               value={option.value}
-              className="cursor-pointer"
+              className="cursor-pointer whitespace-nowrap"
             >
               {option.label}
             </DropdownMenuRadioItem>

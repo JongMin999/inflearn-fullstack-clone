@@ -28,7 +28,7 @@ export default async function SearchPage({
       <CourseList
         q={searchQuery}
         page={page_number ? parseInt(page_number) : 1}
-        sortBy={(sortBy as "latest" | "popular" | "recommended") || "latest"}
+        sortBy={(sortBy as "latest" | "popular" | "recommended" | "price_low" | "price_high") || "latest"}
         baseUrl="/search"
       />
     </div>

@@ -208,7 +208,7 @@ export default function CourseCard({ user, course }: CourseCardProps) {
       {/* 호버 시 표시되는 상세 정보 오버레이 */}
       <div
         className={cn(
-          "absolute inset-0 bg-white border border-gray-200 rounded-md shadow-lg p-4 z-50 flex flex-col transition-opacity duration-300",
+          "absolute top-0 left-0 right-0 bg-white border border-gray-200 rounded-md shadow-lg p-4 z-50 flex flex-col transition-opacity duration-300 min-h-full",
           isHovered ? "opacity-100" : "opacity-0 pointer-events-none"
         )}
         onClick={(e) => {
@@ -223,7 +223,7 @@ export default function CourseCard({ user, course }: CourseCardProps) {
 
           {/* 상세 설명 */}
           {course.shortDescription && (
-            <p className="text-sm text-gray-600 mb-4 line-clamp-3">
+            <p className="text-sm text-gray-600 mb-4 break-words whitespace-pre-wrap">
               {course.shortDescription}
             </p>
           )}

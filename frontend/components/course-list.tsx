@@ -14,7 +14,13 @@ import { auth } from "@/auth";
 import CourseSortSelector from "./course-sort-selector";
 import { Suspense } from "react";
 
-interface CourseListProps extends SearchCourseDto {
+interface CourseListProps {
+  q?: string;
+  category?: string;
+  priceRange?: SearchCourseDto['priceRange'];
+  sortBy?: "latest" | "popular" | "recommended" | "price_low" | "price_high";
+  page?: number;
+  pageSize?: number;
   baseUrl?: string;
 }
 
@@ -32,7 +38,7 @@ export default async function CourseList({
     q: q?.trim() || undefined, // 공백만 있으면 undefined로 전달
     category,
     priceRange,
-    sortBy,
+    sortBy: sortBy as any, // OpenAPI 타입이 업데이트되기 전까지 임시 처리
     page,
     pageSize,
   });

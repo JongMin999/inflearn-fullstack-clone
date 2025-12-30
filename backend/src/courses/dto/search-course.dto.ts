@@ -50,13 +50,13 @@ export class SearchCourseDto {
   @ApiProperty({
     description: '정렬 기준',
     required: false,
-    enum: ['price'],
-    default: 'price',
+    enum: ['latest', 'popular', 'recommended', 'price_low', 'price_high'],
+    default: 'latest',
   })
   @IsOptional()
   @IsString()
-  @IsIn(['price'])
-  sortBy?: string = 'price';
+  @IsIn(['latest', 'popular', 'recommended', 'price_low', 'price_high'])
+  sortBy?: string = 'latest';
 
   @ApiProperty({
     description: '정렬 순서',
