@@ -10,6 +10,8 @@ import { Trash2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as api from "@/lib/api";
+import PortOne from "@portone/browser-sdk/v2";
+import { toast } from "sonner";
 
 // 임시 장바구니 데이터 타입
 interface CartItem {
@@ -26,7 +28,9 @@ export default function CartUI() {
     customerName: "",
     customerPhone: "",
   });
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+
+  const [isPaymentProcessing, setIsPaymentProcessing] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("ko-KR").format(price);
@@ -39,61 +43,58 @@ export default function CartUI() {
     return Math.round(((originalPrice - discountPrice) / originalPrice) * 100);
   };
 
+  const generatePaymentId = () =>
+    `order_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
   const cartItemsQuery = useQuery({
     queryFn: () => api.getCartItems(),
     queryKey: ["cart-items"],
+    select: (data) => data.data,
   });
 
   // 장바구니 아이템이 로드되면 모든 아이템을 기본 선택
   useEffect(() => {
-    if (cartItemsQuery.data?.data?.items) {
-      const allItemIds = new Set(
-        cartItemsQuery.data.data.items.map((item) => item.id)
-      );
-      setSelectedItems(allItemIds);
+    if (cartItemsQuery.data?.items) {
+      setSelectedItems(cartItemsQuery.data.items.map((item) => item.id));
     }
-  }, [cartItemsQuery.data?.data?.items]);
+  }, [cartItemsQuery.data?.items]);
 
   // 전체 선택/해제 핸들러
   const handleSelectAll = (checked: boolean) => {
-    if (checked && cartItemsQuery.data?.data?.items) {
-      const allItemIds = new Set(
-        cartItemsQuery.data.data.items.map((item) => item.id)
-      );
-      setSelectedItems(allItemIds);
+    if (checked && cartItemsQuery.data?.items) {
+      setSelectedItems(cartItemsQuery.data.items.map((item) => item.id));
     } else {
-      setSelectedItems(new Set());
+      setSelectedItems([]);
     }
   };
 
   // 개별 아이템 선택/해제 핸들러
-  const handleItemSelect = (itemId: string, checked: boolean) => {
-    const newSelected = new Set(selectedItems);
-    if (checked) {
-      newSelected.add(itemId);
-    } else {
-      newSelected.delete(itemId);
-    }
-    setSelectedItems(newSelected);
+  const handleSelectItem = (itemId: string) => {
+    setSelectedItems((prev) =>
+      prev.includes(itemId)
+        ? prev.filter((id) => id !== itemId)
+        : [...prev, itemId]
+    );
   };
 
   // 전체 선택 여부 확인
   const isAllSelected =
-    cartItemsQuery.data?.data?.items &&
-    cartItemsQuery.data.data.items.length > 0 &&
-    selectedItems.size === cartItemsQuery.data.data.items.length;
+    cartItemsQuery.data?.items &&
+    cartItemsQuery.data.items.length > 0 &&
+    selectedItems.length === cartItemsQuery.data.items.length;
 
-  // 선택된 아이템들의 가격 계산
-  const selectedItemsData = cartItemsQuery.data?.data?.items.filter((item) =>
-    selectedItems.has(item.id)
+  // 선택된 아이템들의 데이터
+  const selectedCartItems = cartItemsQuery.data?.items.filter((item) =>
+    selectedItems.includes(item.id)
   ) ?? [];
 
-  const selectedTotalOriginalPrice = selectedItemsData.reduce(
+  // 선택된 아이템들의 가격 계산
+  const selectedTotalOriginalPrice = selectedCartItems.reduce(
     (sum, item) => sum + item.course.price,
     0
   );
 
-  const selectedTotalDiscountPrice = selectedItemsData.reduce(
+  const selectedTotalDiscountPrice = selectedCartItems.reduce(
     (sum, item) =>
       sum + (item.course.discountPrice || item.course.price),
     0
@@ -108,8 +109,11 @@ export default function CartUI() {
     },
   });
 
-
-  const handlePayment = () => {
+  const handlePayment = async () => {
+    if (selectedItems.length === 0) {
+      alert("결제할 강의를 선택해주세요");
+      return;
+    }
     if (
       !customerInfo.customerEmail ||
       !customerInfo.customerName ||
@@ -118,14 +122,69 @@ export default function CartUI() {
       alert("구매자 정보를 모두 입력해주세요.");
       return;
     }
-    alert("결제 기능은 준비 중입니다.");
+    setIsPaymentProcessing(true);
+
+    try {
+      const paymentId = generatePaymentId();
+      const orderName =
+        selectedCartItems.length === 1
+          ? selectedCartItems[0].course.title
+          : `${selectedCartItems[0].course.title} 외 ${
+              selectedCartItems.length - 1
+            }개`;
+
+      const payment = await PortOne.requestPayment({
+        storeId: process.env.NEXT_PUBLIC_PORTONE_STORE_ID || "store-test",
+        channelKey:
+          process.env.NEXT_PUBLIC_PORTONE_CHANNEL_KEY || "channel-test-key",
+        paymentId,
+        orderName,
+        totalAmount: selectedTotalDiscountPrice,
+        currency: "CURRENCY_KRW",
+        payMethod: "CARD",
+        customer: {
+          fullName: customerInfo.customerName,
+          email: customerInfo.customerEmail,
+          phoneNumber: customerInfo.customerPhone,
+        },
+        customData: {
+          items: selectedCartItems.map((item) => ({
+            courseId: item.course.id,
+            price: item.course.discountPrice || item.course.price,
+          })),
+          customerInfo,
+        },
+      });
+
+      if (!payment || payment.code !== undefined) {
+        alert(`결제 실패: ${payment?.message || "알 수 없는 오류"}`);
+        return;
+      }
+
+      const result = await api.verifyPayment({ paymentId });
+
+      console.log("Payment 결과", result);
+
+      if ((result.data as any)["success"]) {
+        toast.success("결제가 완료되었습니다!");
+        queryClient.invalidateQueries({ queryKey: ["cart-items"] });
+        router.push("/my/courses");
+      } else {
+        alert(`결제 검증 실패: ${(result.data as any)["message"]}`);
+      }
+    } catch (error) {
+      console.error("결제 오류", error);
+      alert("결제 중 오류가 발생했습니다. 다시 시도해주세요.");
+    } finally {
+      setIsPaymentProcessing(false);
+    }
   };
 
   if (cartItemsQuery.isLoading) {
     return <div>로딩중...</div>;
   }
 
-  if (cartItemsQuery?.data?.data?.totalCount === 0) {
+  if (cartItemsQuery?.data?.totalCount === 0) {
     return (
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold mb-8">수강바구니</h1>
@@ -157,21 +216,21 @@ export default function CartUI() {
               <h2 className="text-lg font-semibold">
                 전체선택{" "}
                 <span className="text-green-600">
-                  {selectedItems.size}/{cartItemsQuery?.data?.data?.totalCount}
+                  {selectedItems.length}/{cartItemsQuery?.data?.totalCount || 0}
                 </span>
               </h2>
             </div>
           </div>
 
-          {cartItemsQuery?.data?.data?.items.map((item) => (
+          {cartItemsQuery?.data?.items.map((item) => (
             <div
               key={item.id}
               className="flex items-center gap-4 p-4 border rounded-lg bg-white"
             >
               <input
                 type="checkbox"
-                checked={selectedItems.has(item.id)}
-                onChange={(e) => handleItemSelect(item.id, e.target.checked)}
+                checked={selectedItems.includes(item.id)}
+                onChange={() => handleSelectItem(item.id)}
                 className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
               />
 
@@ -355,9 +414,10 @@ export default function CartUI() {
             {/* 결제 버튼 */}
             <Button
               onClick={handlePayment}
+              disabled={isPaymentProcessing}
               className="w-full mt-4 bg-green-600 hover:bg-green-700 text-white font-semibold py-3"
             >
-              결제하기
+              {isPaymentProcessing ? "결제 진행 중..." : "결제하기"}
             </Button>
           </div>
         </div>
