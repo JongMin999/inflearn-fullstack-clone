@@ -183,7 +183,11 @@ export default function SiteHeader({
                   {recentCartItems.map((item) => (
                     <div
                       key={item.id}
-                      className="flex items-center gap-3 p-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-b-0"
+                      className="flex items-center gap-3 p-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-b-0 cursor-pointer"
+                      onClick={() => {
+                        router.push(`/course/${item.course.id}`);
+                        setIsCartPopoverOpen(false);
+                      }}
                     >
                       <div className="relative w-12 h-8 flex-shrink-0">
                         {item.course.thumbnailUrl && (
@@ -276,6 +280,12 @@ export default function SiteHeader({
                 onClick={() => (window.location.href = "/my/settings/account")}
               >
                 <div className="font-semibold text-gray-800 group-hover:text-[#1dc078] transition-colors">프로필 수정</div>
+              </button>
+              <button
+                className="group w-full text-left px-4 py-3 hover:bg-[#1dc078]/10 transition-colors focus:outline-none border-t border-gray-100"
+                onClick={() => router.push("/my/courses")}
+              >
+                <div className="font-semibold text-gray-800 group-hover:text-[#1dc078] transition-colors">내 학습</div>
               </button>
               <button
                 className="group w-full text-left px-4 py-3 hover:bg-[#1dc078]/10 transition-colors focus:outline-none border-t border-gray-100"
