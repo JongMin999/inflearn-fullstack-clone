@@ -6,6 +6,8 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject } from '@nestjs/common';
 import { Course, Prisma } from '@prisma/client';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
@@ -23,7 +25,10 @@ import { CourseReviewsResponseDto } from './dto/course-reviews-response.dto';
 
 @Injectable()
 export class CoursesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+  ) {}
 
   async create(
     userId: string,
@@ -296,42 +301,67 @@ export class CoursesService {
       }),
     );
 
-    // 지식공유자 통계 계산
+    // 지식공유자 통계 계산 (캐싱 적용)
     const instructorId = course.instructorId;
+    const instructorStatsCacheKey = `instructor:stats:${instructorId}`;
 
-    // 해당 강사의 모든 강의에 등록된 총 수강생 수 (중복 제거)
-    const uniqueStudents = await this.prisma.courseEnrollment.findMany({
-      where: {
-        course: {
-          instructorId,
-        },
-      },
-      select: {
-        userId: true,
-      },
-    });
-    const totalStudents = new Set(uniqueStudents.map((e) => e.userId)).size;
+    let instructorStats = await this.cacheManager.get<{
+      totalStudents: number;
+      totalReviews: number;
+      totalAnswers: number;
+    }>(instructorStatsCacheKey);
 
-    // 해당 강사의 모든 강의에 대한 총 수강평 수
-    const totalInstructorReviews = await this.prisma.courseReview.count({
-      where: {
-        course: {
-          instructorId,
+    if (!instructorStats) {
+      // 해당 강사의 모든 강의에 등록된 총 수강생 수 (중복 제거)
+      const uniqueStudents = await this.prisma.courseEnrollment.findMany({
+        where: {
+          course: {
+            instructorId,
+          },
         },
-      },
-    });
+        select: {
+          userId: true,
+        },
+      });
+      const totalStudents = new Set(uniqueStudents.map((e) => e.userId)).size;
 
-    // 해당 강사가 작성한 답변 수
-    const totalInstructorAnswers = await this.prisma.courseReview.count({
-      where: {
-        course: {
-          instructorId,
+      // 해당 강사의 모든 강의에 대한 총 수강평 수
+      const totalInstructorReviews = await this.prisma.courseReview.count({
+        where: {
+          course: {
+            instructorId,
+          },
         },
-        instructorReply: {
-          not: null,
+      });
+
+      // 해당 강사가 작성한 답변 수
+      const totalInstructorAnswers = await this.prisma.courseReview.count({
+        where: {
+          course: {
+            instructorId,
+          },
+          instructorReply: {
+            not: null,
+          },
         },
-      },
-    });
+      });
+
+      instructorStats = {
+        totalStudents,
+        totalReviews: totalInstructorReviews,
+        totalAnswers: totalInstructorAnswers,
+      };
+
+      // 강사 통계 캐싱 (5분)
+      await this.cacheManager.set(
+        instructorStatsCacheKey,
+        instructorStats,
+        5 * 60 * 1000,
+      );
+    }
+
+    const { totalStudents, totalReviews: totalInstructorReviews, totalAnswers: totalInstructorAnswers } =
+      instructorStats;
 
     const result = {
       ...course,
@@ -437,6 +467,21 @@ export class CoursesService {
   ): Promise<SearchCourseResponseDto> {
     const { q, category, priceRange, sortBy = 'latest', page, pageSize } =
       searchCourseDto;
+
+    // 인기순/추천순은 메모리 정렬이 필요하므로 캐싱 적용
+    const shouldCache = sortBy === 'popular' || sortBy === 'recommended';
+    const cacheKey = shouldCache
+      ? `courses:search:${sortBy}:${category || 'all'}:${page}:${pageSize}`
+      : null;
+
+    if (shouldCache && cacheKey) {
+      const cachedResult = await this.cacheManager.get<SearchCourseResponseDto>(
+        cacheKey,
+      );
+      if (cachedResult) {
+        return cachedResult;
+      }
+    }
 
     const where: Prisma.CourseWhereInput = {
       // PUBLISHED 상태인 강의만 표시
@@ -644,7 +689,7 @@ export class CoursesService {
     const hasNext = page < totalPages;
     const hasPrev = page > 1;
 
-    return {
+    const result = {
       courses: coursesWithStats,
       pagination: {
         currentPage: page,
@@ -654,6 +699,13 @@ export class CoursesService {
         hasPrev,
       },
     };
+
+    // 인기순/추천순 결과 캐싱 (2분)
+    if (shouldCache && cacheKey) {
+      await this.cacheManager.set(cacheKey, result, 2 * 60 * 1000);
+    }
+
+    return result;
   }
 
   async addFavorite(courseId: string, userId: string): Promise<boolean> {
@@ -674,6 +726,9 @@ export class CoursesService {
           courseId,
         },
       });
+
+      // 인기순/추천순 캐시 무효화
+      await this.invalidateCourseListCache();
 
       return true;
     } catch (err) {
@@ -696,6 +751,8 @@ export class CoursesService {
             id: existingFavorite.id,
           },
         });
+        // 인기순/추천순 캐시 무효화
+        await this.invalidateCourseListCache();
         return true;
       }
 
@@ -769,6 +826,11 @@ export class CoursesService {
         throw new ConflictException('이미 수강신청한 강의입니다.');
       }
 
+      const course = await this.prisma.course.findUnique({
+        where: { id: courseId },
+        select: { instructorId: true },
+      });
+
       await this.prisma.courseEnrollment.create({
         data: {
           userId,
@@ -776,6 +838,13 @@ export class CoursesService {
           enrolledAt: new Date(),
         },
       });
+
+      // 인기순 캐시 무효화 (수강생 수 변경)
+      await this.invalidateCourseListCache();
+      // 강사 통계 캐시 무효화
+      if (course) {
+        await this.invalidateInstructorStatsCache(course.instructorId);
+      }
 
       return true;
     } catch (err) {
@@ -804,6 +873,32 @@ export class CoursesService {
     sort: 'latest' | 'oldest' | 'rating_high' | 'rating_low',
     userId?: string,
   ): Promise<CourseReviewsResponseDto> {
+    // 리뷰 목록 캐싱 (로그인한 사용자의 myReview는 제외하고 캐싱)
+    const cacheKey = `course:reviews:${courseId}:${sort}:${page}:${pageSize}`;
+    const cachedResult = await this.cacheManager.get<Omit<
+      CourseReviewsResponseDto,
+      'myReviewExists'
+    >>(cacheKey);
+
+    if (cachedResult) {
+      // myReview는 사용자별로 다르므로 별도 조회
+      const myReview =
+        userId &&
+        (await this.prisma.courseReview.findUnique({
+          where: {
+            userId_courseId: {
+              userId,
+              courseId,
+            },
+          },
+        }));
+
+      return {
+        ...cachedResult,
+        myReviewExists: !!myReview,
+      };
+    }
+
     const where: Prisma.CourseReviewWhereInput = {
       courseId,
     };
@@ -852,7 +947,7 @@ export class CoursesService {
       },
     });
 
-    return {
+    const result = {
       myReviewExists: !!myReview,
       totalReviewCount: totalItems,
       currentPage: page,
@@ -862,6 +957,12 @@ export class CoursesService {
       hasPrev,
       reviews: reviews as unknown as CourseReviewEntity[],
     };
+
+    // myReviewExists를 제외하고 캐싱 (1분)
+    const { myReviewExists, ...cacheableResult } = result;
+    await this.cacheManager.set(cacheKey, cacheableResult, 60 * 1000);
+
+    return result;
   }
 
   async createReview(
@@ -922,6 +1023,10 @@ export class CoursesService {
       },
     });
 
+    // 리뷰 관련 캐시 무효화
+    await this.invalidateCourseReviewCache(courseId);
+    await this.invalidateInstructorStatsCache(course.instructorId);
+
     return review as unknown as CourseReviewEntity;
   }
 
@@ -952,7 +1057,19 @@ export class CoursesService {
         content: updateReviewDto.content,
         rating: updateReviewDto.rating,
       },
+      include: {
+        course: {
+          select: {
+            id: true,
+            instructorId: true,
+          },
+        },
+      },
     });
+
+    // 리뷰 관련 캐시 무효화
+    await this.invalidateCourseReviewCache(response.course.id);
+    await this.invalidateInstructorStatsCache(response.course.instructorId);
 
     return response as unknown as CourseReviewEntity;
   }
@@ -972,11 +1089,27 @@ export class CoursesService {
       throw new UnauthorizedException('리뷰의 작성자만 삭제할 수 있습니다.');
     }
 
+    const course = await this.prisma.course.findUnique({
+      where: {
+        id: existingReview.courseId,
+      },
+      select: {
+        id: true,
+        instructorId: true,
+      },
+    });
+
     await this.prisma.courseReview.delete({
       where: {
         id: reviewId,
       },
     });
+
+    // 리뷰 관련 캐시 무효화
+    if (course) {
+      await this.invalidateCourseReviewCache(course.id);
+      await this.invalidateInstructorStatsCache(course.instructorId);
+    }
 
     return true;
   }
@@ -1016,7 +1149,48 @@ export class CoursesService {
       },
     });
 
+    // 강사 통계 캐시 무효화 (답변 수 변경)
+    await this.invalidateInstructorStatsCache(review.course.instructorId);
+    // 리뷰 목록 캐시 무효화
+    await this.invalidateCourseReviewCache(review.courseId);
+
     return updatedReview as unknown as CourseReviewEntity;
+  }
+
+  // 캐시 무효화 헬퍼 메서드들
+  // Note: NestJS cache-manager는 키 패턴 매칭을 지원하지 않으므로,
+  // 주요 정렬 옵션과 카테고리 조합에 대해 직접 무효화
+  private async invalidateCourseListCache() {
+    // 인기순/추천순 캐시 무효화 (주요 조합만)
+    const sortOptions = ['popular', 'recommended'];
+    const categories = ['all', null]; // null은 전체 카테고리
+    const pages = [1, 2]; // 첫 페이지들만 무효화
+
+    for (const sort of sortOptions) {
+      for (const category of categories) {
+        for (const page of pages) {
+          const key = `courses:search:${sort}:${category || 'all'}:${page}:20`;
+          await this.cacheManager.del(key);
+        }
+      }
+    }
+  }
+
+  private async invalidateCourseReviewCache(courseId: string) {
+    // 리뷰 목록 캐시 무효화 (주요 정렬 옵션과 페이지)
+    const sortOptions = ['latest', 'oldest', 'rating_high', 'rating_low'];
+    const pages = [1, 2];
+
+    for (const sort of sortOptions) {
+      for (const page of pages) {
+        const key = `course:reviews:${courseId}:${sort}:${page}:10`;
+        await this.cacheManager.del(key);
+      }
+    }
+  }
+
+  private async invalidateInstructorStatsCache(instructorId: string) {
+    await this.cacheManager.del(`instructor:stats:${instructorId}`);
   }
 
   async getInstructorReviews(userId: string): Promise<CourseReviewEntity[]> {
