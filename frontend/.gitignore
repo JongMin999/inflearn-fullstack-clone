@@ -42,3 +42,4 @@ next-env.d.ts
 
 generated/
 INTERVIEW_QUESTIONS.md
+.env.sentry-build-plugin
