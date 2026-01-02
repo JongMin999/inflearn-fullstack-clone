@@ -63,23 +63,23 @@ export default function SiteHeader({
   }
   
   return (
-    <header className="relative site-header w-full bg-white">
+    <header className="relative site-header w-full bg-white z-50">
       {/* 상단 헤더 */}
-      <div className="header-top flex items-center justify-between px-4 md:px-8 py-3 gap-2 md:gap-4 flex-nowrap overflow-hidden">
+      <div className="header-top flex items-center justify-between px-2 sm:px-4 md:px-8 py-2 md:py-3 gap-1 sm:gap-2 md:gap-4 flex-nowrap overflow-hidden">
         {/* 로고 */}
-        <div className="logo flex-shrink-0 min-w-[80px] md:min-w-[120px]">
+        <div className="logo flex-shrink-0 min-w-[60px] sm:min-w-[80px] md:min-w-[120px]">
           <Link href="/">
             <Image
               src="/images/inflearn_public_logo.png"
-              className="w-20 md:w-28 h-auto"
+              className="w-16 sm:w-20 md:w-28 h-auto"
               width={120}
               height={32}
               alt="inflearn"
             />
           </Link>
         </div>
-        {/* 네비게이션 */}
-        <nav className="main-nav flex gap-2 md:gap-4 lg:gap-6 text-xs md:text-sm lg:text-base font-bold text-gray-700 flex-shrink-0 flex-nowrap">
+        {/* 네비게이션 - 모바일에서 숨김 */}
+        <nav className="main-nav hidden md:flex gap-2 md:gap-4 lg:gap-6 text-xs md:text-sm lg:text-base font-bold text-gray-700 flex-shrink-0 flex-nowrap">
           <Link href="#" className="hover:text-[#1dc078] transition-colors whitespace-nowrap">
             강의
           </Link>
@@ -94,12 +94,12 @@ export default function SiteHeader({
           </Link>
         </nav>
         {/* 검색창 + 아이콘 */}
-        <div className="flex-1 flex justify-center min-w-0">
+        <div className="flex-1 flex justify-center min-w-0 max-w-[200px] sm:max-w-none">
           <div className="relative flex w-full items-center">
             <Input
               type="text"
               placeholder="나의 진짜 성장을 도와줄 실무 강의를 찾아보세요"
-              className="w-full bg-gray-50 border-gray-200 focus-visible:ring-[#1dc078] pr-8 md:pr-10 text-xs md:text-sm"
+              className="w-full bg-gray-50 border-gray-200 focus-visible:ring-[#1dc078] pr-6 sm:pr-8 md:pr-10 text-xs md:text-sm placeholder:text-[10px] sm:placeholder:text-xs"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => {
@@ -117,7 +117,7 @@ export default function SiteHeader({
             />
             <button
               type="button"
-              className="absolute right-2 p-1 text-gray-400 hover:text-[#1dc078] transition-colors"
+              className="absolute right-1 sm:right-2 p-1 text-gray-400 hover:text-[#1dc078] transition-colors"
               tabIndex={-1}
               onClick={() => {
                 if (search.trim()) {
@@ -127,12 +127,12 @@ export default function SiteHeader({
                 }
               }}
             >
-              <Search size={16} className="md:w-5 md:h-5" />
+              <Search size={14} className="sm:w-4 sm:h-4 md:w-5 md:h-5" />
             </button>
           </div>
         </div>
-        {/* 지식공유자 버튼 */}
-        <Link href="/instructor" className="flex-shrink-0">
+        {/* 지식공유자 버튼 - 모바일에서 숨김 */}
+        <Link href="/instructor" className="hidden sm:flex flex-shrink-0">
           <Button
             variant="outline"
             className="font-semibold border-gray-200 hover:border-[#1dc078] hover:text-[#1dc078] text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4 py-1.5 md:py-2 whitespace-nowrap"
@@ -143,21 +143,21 @@ export default function SiteHeader({
 
          {/* 장바구니 아이콘 + Popover */}
          <div 
-           className="relative"
+           className="relative flex-shrink-0"
            onMouseEnter={() => setIsCartPopoverOpen(true)}
            onMouseLeave={() => setIsCartPopoverOpen(false)}
          >
           <Popover open={isCartPopoverOpen} onOpenChange={setIsCartPopoverOpen}>
             <PopoverTrigger asChild>
               <button 
-                className="relative flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer"
+                className="relative flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer"
                 onClick={() => router.push("/carts")}
               >
-                <ShoppingCart className="size-5 text-gray-700" />
+                <ShoppingCart className="w-4 h-4 sm:size-5 text-gray-700" />
                 {(cartItemsQuery?.data?.data?.totalCount ?? 0) > 0 && (
                   <Badge
                     variant="destructive"
-                    className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center text-xs p-0 bg-red-500 text-white"
+                    className="absolute -top-1 -right-1 h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center text-[10px] sm:text-xs p-0 bg-red-500 text-white"
                   >
                     {cartItemsQuery?.data?.data?.totalCount}
                   </Badge>
@@ -246,8 +246,8 @@ export default function SiteHeader({
         {session ? (
           <Popover>
             <PopoverTrigger asChild>
-              <div className="ml-2 cursor-pointer">
-                <Avatar>
+              <div className="ml-1 sm:ml-2 cursor-pointer flex-shrink-0">
+                <Avatar className="w-7 h-7 sm:w-10 sm:h-10">
                   {profile?.image ? (
                     <img
                       src={profile.image}
@@ -255,7 +255,7 @@ export default function SiteHeader({
                       className="w-full h-full object-cover rounded-full"
                     />
                   ) : (
-                    <AvatarFallback>
+                    <AvatarFallback className="text-xs sm:text-sm">
                       <span role="img" aria-label="user">
                         👤
                       </span>
@@ -296,10 +296,10 @@ export default function SiteHeader({
             </PopoverContent>
           </Popover>
         ) : (
-          <Link href="/signin">
+          <Link href="/signin" className="flex-shrink-0">
             <Button
               variant="outline"
-              className="font-semibold border-gray-200 hover:border-[#1dc078] hover:text-[#1dc078] ml-2"
+              className="font-semibold border-gray-200 hover:border-[#1dc078] hover:text-[#1dc078] ml-1 sm:ml-2 text-xs sm:text-sm px-2 sm:px-4 py-1 sm:py-2"
             >
               로그인
             </Button>
@@ -307,9 +307,9 @@ export default function SiteHeader({
         )}
       </div>
       {/* 하단 카테고리 */}
-      <div className="header-bottom bg-white px-8">
+      <div className="header-bottom bg-white px-2 sm:px-4 md:px-8">
         {isCategoryNeeded && (
-           <nav className="category-nav flex justify-start gap-6 py-4 overflow-x-auto xl:overflow-x-visible scrollbar-none">
+           <nav className="category-nav flex justify-start gap-3 sm:gap-4 md:gap-6 py-3 sm:py-4 overflow-x-auto xl:overflow-x-visible scrollbar-none">
             {/* 전체 카테고리 */}
             <Link href="/courses">
               <div className="category-item flex flex-col items-center min-w-[72px] text-gray-700 hover:text-[#1dc078] cursor-pointer transition-colors">
