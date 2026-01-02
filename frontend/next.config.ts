@@ -10,12 +10,16 @@ const nextConfig: NextConfig = {
   },
   images: {
     remotePatterns: [
+      ...(process.env.CLOUD_FRONT_DOMAIN
+        ? [
+            {
+              protocol: "https" as const,
+              hostname: process.env.CLOUD_FRONT_DOMAIN as string,
+            },
+          ]
+        : []),
       {
-        protocol: "https",
-        hostname: process.env.CLOUD_FRONT_DOMAIN as string,
-      },
-      {
-        protocol: "https",
+        protocol: "https" as const,
         hostname: "cdn.inflearn.com",
       },
     ],
@@ -44,4 +48,8 @@ export default withSentryConfig(nextConfig, {
   // Note: Check that the configured route will not match with your Next.js middleware, otherwise reporting of client-
   // side errors will fail.
   tunnelRoute: "/monitoring",
+
+  disableLogger: true,
+
+  automaticVercelMonitors: true,
 });

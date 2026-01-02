@@ -438,39 +438,39 @@ export class CoursesService {
     }>(instructorStatsCacheKey);
 
     if (!instructorStats) {
-      // 해당 강사의 모든 강의에 등록된 총 수강생 수 (중복 제거)
-      const uniqueStudents = await this.prisma.courseEnrollment.findMany({
-        where: {
-          course: {
-            instructorId,
-          },
+    // 해당 강사의 모든 강의에 등록된 총 수강생 수 (중복 제거)
+    const uniqueStudents = await this.prisma.courseEnrollment.findMany({
+      where: {
+        course: {
+          instructorId,
         },
-        select: {
-          userId: true,
-        },
-      });
-      const totalStudents = new Set(uniqueStudents.map((e) => e.userId)).size;
+      },
+      select: {
+        userId: true,
+      },
+    });
+    const totalStudents = new Set(uniqueStudents.map((e) => e.userId)).size;
 
-      // 해당 강사의 모든 강의에 대한 총 수강평 수
-      const totalInstructorReviews = await this.prisma.courseReview.count({
-        where: {
-          course: {
-            instructorId,
-          },
+    // 해당 강사의 모든 강의에 대한 총 수강평 수
+    const totalInstructorReviews = await this.prisma.courseReview.count({
+      where: {
+        course: {
+          instructorId,
         },
-      });
+      },
+    });
 
-      // 해당 강사가 작성한 답변 수
-      const totalInstructorAnswers = await this.prisma.courseReview.count({
-        where: {
-          course: {
-            instructorId,
-          },
-          instructorReply: {
-            not: null,
-          },
+    // 해당 강사가 작성한 답변 수
+    const totalInstructorAnswers = await this.prisma.courseReview.count({
+      where: {
+        course: {
+          instructorId,
         },
-      });
+        instructorReply: {
+          not: null,
+        },
+      },
+    });
 
       instructorStats = {
         totalStudents,

@@ -7,7 +7,7 @@ import * as jwt from 'jsonwebtoken';
 import { JWT } from 'next-auth/jwt'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  useSecureCookies: process.env.NODE_ENV === "production",
+  useSecureCookies: process.env.USE_HTTPS === "true",
   trustHost: true,
   adapter: PrismaAdapter(prisma),
   secret: process.env.AUTH_SECRET,
@@ -78,8 +78,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.sub as string;
-        session.user.email = token.email as string | null | undefined;
-        session.user.name = token.name as string | null | undefined;
+        if (token.email) {
+          session.user.email = token.email;
+        }
+        if (token.name) {
+          session.user.name = token.name;
+        }
       }
       return session;
     },
