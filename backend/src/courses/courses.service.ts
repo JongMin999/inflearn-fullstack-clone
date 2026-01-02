@@ -718,6 +718,23 @@ export class CoursesService {
       }
     }
 
+    // 할인 강의 필터
+    const needDiscountFilter = searchCourseDto.discount;
+    if (needDiscountFilter) {
+      where.discountPrice = {
+        not: null,
+      };
+    }
+
+    // 난이도 필터 (하나만 선택 가능)
+    if (searchCourseDto.beginner) {
+      where.level = 'BEGINNER';
+    } else if (searchCourseDto.intermediate) {
+      where.level = 'INTERMEDIATE';
+    } else if (searchCourseDto.advanced) {
+      where.level = 'ADVANCED';
+    }
+
     // 정렬 조건
     let orderBy: Prisma.CourseOrderByWithRelationInput | Prisma.CourseOrderByWithRelationInput[] = {};
     let needInMemorySort = false;
@@ -739,9 +756,10 @@ export class CoursesService {
     const totalItems = await this.prisma.course.count({ where });
     
     // 강의 목록 조회
-    // 인기순/추천순의 경우 더 많은 데이터를 가져와서 정렬 후 페이지네이션
-    const take = needInMemorySort ? totalItems : pageSize;
-    const skip = needInMemorySort ? 0 : (page - 1) * pageSize;
+    // 인기순/추천순 또는 할인 필터의 경우 더 많은 데이터를 가져와서 필터링 후 페이지네이션
+    const needExtraData = needInMemorySort || needDiscountFilter;
+    const take = needExtraData ? totalItems : pageSize;
+    const skip = needExtraData ? 0 : (page - 1) * pageSize;
 
     const courses = await this.prisma.course.findMany({
       where,
@@ -792,6 +810,19 @@ export class CoursesService {
       } as any;
     });
 
+    // 할인 강의 필터 (discountPrice < price 조건)
+    if (needDiscountFilter) {
+      coursesWithStats = coursesWithStats.filter(
+        (course) => course.discountPrice && course.discountPrice < course.price
+      );
+      // 할인 필터 적용 후 최신순 정렬 유지
+      if (sortBy === 'latest') {
+        coursesWithStats.sort((a, b) => {
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+      }
+    }
+
     // 메모리에서 정렬 (인기순, 추천순)
     if (needInMemorySort) {
       if (sortBy === 'popular') {
@@ -803,14 +834,35 @@ export class CoursesService {
           return b._count.favorites - a._count.favorites;
         });
       }
+    }
 
-      // 정렬 후 페이지네이션 적용
+    // 할인 필터나 메모리 정렬이 필요한 경우 페이지네이션 적용
+    if (needExtraData) {
+      // 할인 필터가 적용된 경우 필터링 후 총 개수로 페이지네이션 계산
+      const filteredTotalItems = needDiscountFilter ? coursesWithStats.length : totalItems;
+      const totalPages = Math.ceil(filteredTotalItems / pageSize);
+      
       const startIndex = (page - 1) * pageSize;
       const endIndex = startIndex + pageSize;
       coursesWithStats = coursesWithStats.slice(startIndex, endIndex);
+      
+      // 페이지네이션 정보 계산
+      const hasNext = page < totalPages;
+      const hasPrev = page > 1;
+      
+      return {
+        courses: coursesWithStats,
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalItems: filteredTotalItems,
+          hasNext,
+          hasPrev,
+        },
+      };
     }
 
-    // 페이지네이션 정보 계산
+    // 일반적인 경우 페이지네이션 정보 계산
     const totalPages = Math.ceil(totalItems / pageSize);
     const hasNext = page < totalPages;
     const hasPrev = page > 1;

@@ -13,35 +13,45 @@ import {
 import { auth } from "@/auth";
 import CourseSortSelector from "./course-sort-selector";
 import { Suspense } from "react";
+import CourseFilterButtons from "./course-filter-buttons";
 
 interface CourseListProps {
   q?: string;
   category?: string;
-  priceRange?: SearchCourseDto['priceRange'];
   sortBy?: "latest" | "popular" | "recommended" | "price_low" | "price_high";
   page?: number;
   pageSize?: number;
   baseUrl?: string;
+  discount?: boolean;
+  beginner?: boolean;
+  intermediate?: boolean;
+  advanced?: boolean;
 }
 
 export default async function CourseList({
   q,
   category,
-  priceRange,
   sortBy = "latest",
   page = 1,
   pageSize = 20,
   baseUrl = "",
+  discount,
+  beginner,
+  intermediate,
+  advanced,
 }: CourseListProps) {
   const session = await auth();
   const { data, error } = await api.searchCourses({
-    q: q?.trim() || undefined, // 공백만 있으면 undefined로 전달
+    q: q?.trim() || undefined,
     category,
-    priceRange,
-    sortBy: sortBy as any, // OpenAPI 타입이 업데이트되기 전까지 임시 처리
+    discount: discount || undefined,
+    beginner: beginner || undefined,
+    intermediate: intermediate || undefined,
+    advanced: advanced || undefined,
+    sortBy: sortBy as any,
     page,
     pageSize,
-  });
+  } as any);
 
   if (error) {
     return (
@@ -58,7 +68,10 @@ export default async function CourseList({
     );
   }
 
-  if (!data?.courses || data.courses.length === 0) {
+  // 서버 사이드에서 필터링된 결과를 사용
+  const filteredCourses = data?.courses || [];
+
+  if (!filteredCourses || filteredCourses.length === 0) {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="text-center">
@@ -77,12 +90,17 @@ export default async function CourseList({
     const params = new URLSearchParams();
     if (q) params.set("q", q);
     if (sortBy) params.set("sortBy", sortBy);
+    if (discount) params.set("discount", "true");
+    if (beginner) params.set("beginner", "true");
+    if (intermediate) params.set("intermediate", "true");
+    if (advanced) params.set("advanced", "true");
     params.set("page_number", pageNumber.toString());
     
     return `${baseUrl}?${params.toString()}`;
   };
 
   const renderPaginationNumbers = () => {
+    if (!data) return [];
     const items = [];
     const { currentPage, totalPages } = data.pagination;
     const maxVisiblePages = 5;
@@ -144,8 +162,11 @@ export default async function CourseList({
 
   return (
     <div className="w-full">
-      {/* 정렬 선택기 */}
-      <div className="mb-6 h-9 flex items-center justify-end">
+      {/* 필터 버튼과 정렬 선택기 */}
+      <div className="mb-6 flex items-center justify-between gap-4">
+        <Suspense fallback={<div className="h-9" />}>
+          <CourseFilterButtons />
+        </Suspense>
         <Suspense fallback={<div className="w-[120px] h-9" />}>
           <CourseSortSelector currentSort={sortBy} />
         </Suspense>
@@ -153,13 +174,13 @@ export default async function CourseList({
 
       {/* 강의 목록 Grid */}
       <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 w-full">
-        {data.courses.map((course) => (
+        {filteredCourses.map((course) => (
           <CourseCard key={course.id} course={course} user={session?.user} />
         ))}
       </div>
 
       {/* 페이지네이션 */}
-      {data.pagination.totalPages > 1 && (
+      {data && data.pagination.totalPages > 1 && (
         <div className="mt-12 flex justify-center">
           <Pagination>
             <PaginationContent>

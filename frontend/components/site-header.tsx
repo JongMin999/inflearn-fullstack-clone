@@ -1,7 +1,7 @@
 "use client";
 
 import { CourseCategory, User } from "@/generated/openapi-client";
-import { Layers, Search, Grid, ShoppingCart } from "lucide-react";
+import { Layers, Search, Grid, ShoppingCart, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import {
   PopoverContent,
 } from "@/components/ui/popover";
 import { CATEGORY_ICONS } from "@/app/constants/category-icons";
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Session } from "next-auth";
 import { signOut } from "next-auth/react";
 import { useQuery } from "@tanstack/react-query";
@@ -38,6 +38,203 @@ export default function SiteHeader({
   const [search, setSearch] = useState("");
   const [isCartPopoverOpen, setIsCartPopoverOpen] = useState(false);
   const router = useRouter();
+  const categoryNavRef = useRef<HTMLElement>(null);
+  const headerBottomRef = useRef<HTMLDivElement>(null);
+  const selectedCategoryRef = useRef<HTMLDivElement>(null);
+  const [selectedBarStyle, setSelectedBarStyle] = useState<{
+    left: number;
+    width: number;
+  } | null>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  // 현재 선택된 카테고리 확인
+  const getCurrentCategory = () => {
+    if (pathname === "/" || pathname === "/courses") {
+      return null; // 전체 선택
+    }
+    const match = pathname.match(/^\/courses\/([^/]+)/);
+    return match ? match[1] : null;
+  };
+
+  const currentCategorySlug = getCurrentCategory();
+
+  // 스크롤 가능 여부 확인
+  const checkScrollability = () => {
+    if (!categoryNavRef.current) {
+      setCanScrollLeft(false);
+      setCanScrollRight(false);
+      return;
+    }
+    const container = categoryNavRef.current;
+    const scrollLeft = container.scrollLeft;
+    const scrollWidth = container.scrollWidth;
+    const clientWidth = container.clientWidth;
+    
+    // 전체 화면(XL 이상)에서는 오른쪽 버튼 숨김
+    const isXLScreen = window.innerWidth >= 1280;
+    
+    // 실제로 스크롤이 필요한지 확인 (5px 여유)
+    const canScroll = scrollWidth > clientWidth + 5;
+    
+    if (!canScroll) {
+      setCanScrollLeft(false);
+      setCanScrollRight(false);
+      return;
+    }
+    
+    // 왼쪽 버튼: 스크롤 위치가 0보다 크면 표시
+    setCanScrollLeft(scrollLeft > 5);
+    
+    // 오른쪽 버튼: XL 화면에서는 숨김, 그 외에는 오른쪽 끝에 도달하지 않았으면 표시
+    if (isXLScreen) {
+      setCanScrollRight(false);
+    } else {
+      const isAtRightEnd = scrollLeft >= scrollWidth - clientWidth - 5;
+      setCanScrollRight(!isAtRightEnd);
+    }
+  };
+
+  // 좌우 스크롤 함수 (한 개씩 이동)
+  const scroll = (direction: "left" | "right") => {
+    if (!categoryNavRef.current) return;
+    const container = categoryNavRef.current;
+    
+    // 첫 번째 카테고리 아이템의 너비를 기준으로 한 개씩 이동
+    const firstItem = container.querySelector('.category-item') as HTMLElement;
+    if (!firstItem) return;
+    
+    const itemWidth = firstItem.offsetWidth;
+    const gap = parseFloat(getComputedStyle(container).gap) || 16;
+    const scrollAmount = itemWidth + gap;
+    
+    const startScrollLeft = container.scrollLeft;
+    const targetScrollLeft =
+      direction === "left"
+        ? startScrollLeft - scrollAmount
+        : startScrollLeft + scrollAmount;
+
+    // 부드러운 커스텀 애니메이션 (더 느리고 부드럽게)
+    const duration = 500; // 500ms로 더 느리게
+    const startTime = performance.now();
+    
+    // easing 함수 (ease-out)
+    const easeOut = (t: number): number => {
+      return 1 - Math.pow(1 - t, 3);
+    };
+
+    const animate = () => {
+      const elapsed = performance.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const easedProgress = easeOut(progress);
+      
+      const currentScrollLeft = startScrollLeft + (targetScrollLeft - startScrollLeft) * easedProgress;
+      container.scrollLeft = currentScrollLeft;
+      
+      // 스크롤 중 위치 업데이트
+      updateSelectedBarPosition();
+      checkScrollability();
+      
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        // 스크롤 완료 후 최종 업데이트
+        container.scrollLeft = targetScrollLeft;
+        setTimeout(() => {
+          updateSelectedBarPosition();
+          checkScrollability();
+        }, 50);
+      }
+    };
+    
+    // 애니메이션 시작
+    requestAnimationFrame(animate);
+  };
+
+  // 선택된 바 위치 업데이트 함수
+  const updateSelectedBarPosition = () => {
+    if (selectedCategoryRef.current && headerBottomRef.current && categoryNavRef.current) {
+      const headerBottom = headerBottomRef.current;
+      const item = selectedCategoryRef.current;
+      const nav = categoryNavRef.current;
+      
+      const headerBottomRect = headerBottom.getBoundingClientRect();
+      const itemRect = item.getBoundingClientRect();
+      const navRect = nav.getBoundingClientRect();
+      
+      // 카테고리 아이템이 네비게이션의 보이는 영역 안에 있는지 확인
+      const itemLeft = itemRect.left;
+      const itemRight = itemRect.right;
+      const navLeft = navRect.left;
+      const navRight = navRect.right;
+      
+      // 아이템이 보이는 영역 안에 있는지 확인 (약간의 여유값 포함)
+      const isVisible = itemLeft >= navLeft - 10 && itemRight <= navRight + 10;
+      
+      if (!isVisible) {
+        // 보이지 않으면 연두색 바를 표시하지 않음
+        setSelectedBarStyle(null);
+        checkScrollability();
+        return;
+      }
+      
+      // header-bottom 컨테이너 기준으로 정확한 위치 계산
+      const left = itemRect.left - headerBottomRect.left;
+      const width = itemRect.width;
+      
+      setSelectedBarStyle({
+        left,
+        width,
+      });
+    } else {
+      setSelectedBarStyle(null);
+    }
+    checkScrollability();
+  };
+
+  useEffect(() => {
+    // 초기 스크롤 위치를 0으로 설정
+    const container = categoryNavRef.current;
+    if (container) {
+      container.scrollLeft = 0;
+    }
+
+    // DOM 업데이트 후 위치 계산
+    const timers = [
+      setTimeout(() => {
+        updateSelectedBarPosition();
+      }, 0),
+      setTimeout(() => {
+        updateSelectedBarPosition();
+      }, 100),
+      setTimeout(() => {
+        updateSelectedBarPosition();
+      }, 300),
+    ];
+
+    const handleResize = () => {
+      setTimeout(() => {
+        updateSelectedBarPosition();
+      }, 50);
+    };
+
+    const handleScroll = () => {
+      updateSelectedBarPosition();
+    };
+
+    window.addEventListener("resize", handleResize);
+    if (container) {
+      container.addEventListener("scroll", handleScroll);
+    }
+
+    return () => {
+      timers.forEach(timer => clearTimeout(timer));
+      window.removeEventListener("resize", handleResize);
+      if (container) {
+        container.removeEventListener("scroll", handleScroll);
+      }
+    };
+  }, [currentCategorySlug, pathname, categories]);
   const cartItemsQuery = useQuery({
     queryFn: () => api.getCartItems(),
     queryKey: ["cart-items"],
@@ -307,34 +504,118 @@ export default function SiteHeader({
         )}
       </div>
       {/* 하단 카테고리 */}
-      <div className="header-bottom bg-white px-2 sm:px-4 md:px-8">
+      <div ref={headerBottomRef} className="header-bottom bg-white px-2 sm:px-4 md:px-8 relative">
         {isCategoryNeeded && (
-           <nav className="category-nav flex justify-start gap-3 sm:gap-4 md:gap-6 py-3 sm:py-4 overflow-x-auto xl:overflow-x-visible scrollbar-none">
+          <>
+            {/* 좌측 화살표 버튼 */}
+            {canScrollLeft && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute left-2 top-1/2 -translate-y-1/2 z-10 h-8 w-8 bg-white shadow-lg hover:bg-gray-50 border border-gray-200 rounded-full hover:shadow-xl transition-all"
+                onClick={() => scroll("left")}
+              >
+                <ChevronLeft className="h-4 w-4 text-gray-700" />
+              </Button>
+            )}
+
+            <nav 
+              ref={categoryNavRef}
+              className="category-nav flex justify-start gap-3 sm:gap-4 md:gap-6 py-3 sm:py-4 overflow-x-auto xl:overflow-x-visible scrollbar-hide"
+              onScroll={checkScrollability}
+              style={{
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none',
+              }}
+            >
             {/* 전체 카테고리 */}
             <Link href="/courses">
-              <div className="category-item flex flex-col items-center min-w-[72px] text-gray-700 hover:text-[#1dc078] cursor-pointer transition-colors">
-                <Grid size={28} className="mb-1" />
-                <span className="text-xs font-medium whitespace-nowrap">전체</span>
+              <div
+                ref={currentCategorySlug === null ? selectedCategoryRef : null}
+                className={`category-item flex flex-col items-center min-w-[72px] cursor-pointer transition-all relative ${
+                  currentCategorySlug === null
+                    ? "text-[#1dc078]"
+                    : "text-gray-700 hover:text-[#1dc078]"
+                }`}
+              >
+                <div
+                  className={`mb-1 p-2 rounded-lg transition-all ${
+                    currentCategorySlug === null
+                      ? "bg-[#1dc078]/10"
+                      : "bg-transparent hover:bg-gray-50"
+                  }`}
+                >
+                  <Grid 
+                    size={28} 
+                    className={
+                      currentCategorySlug === null ? "text-[#1dc078]" : ""
+                    }
+                  />
+                </div>
+                <span className="text-xs font-medium whitespace-nowrap">
+                  전체
+                </span>
               </div>
             </Link>
-            {categories.map((category) => (
-              <Link key={category.id} href={`/courses/${category.slug}`}>
-                <div className="category-item flex flex-col items-center min-w-[72px] text-gray-700 hover:text-[#1dc078] cursor-pointer transition-colors">
-                   {/* <Layers size={28} className="mb-1" /> */}
-                   {React.createElement(
-                    CATEGORY_ICONS[category.slug] || CATEGORY_ICONS["default"],
-                    {
-                      size: 28,
-                      className: "mb-1",
-                    }
-                  )}
-                  <span className="text-xs font-medium whitespace-nowrap">
-                    {category.name}
-                  </span>
-                </div>
-              </Link>
-            ))}
-          </nav>
+            {categories.map((category) => {
+              const isSelected = currentCategorySlug === category.slug;
+              return (
+                <Link key={category.id} href={`/courses/${category.slug}`}>
+                  <div
+                    ref={isSelected ? selectedCategoryRef : null}
+                    className={`category-item flex flex-col items-center min-w-[72px] cursor-pointer transition-all relative ${
+                      isSelected
+                        ? "text-[#1dc078]"
+                        : "text-gray-700 hover:text-[#1dc078]"
+                    }`}
+                  >
+                    <div
+                      className={`mb-1 p-2 rounded-lg transition-all ${
+                        isSelected
+                          ? "bg-[#1dc078]/10"
+                          : "bg-transparent hover:bg-gray-50"
+                      }`}
+                    >
+                      {React.createElement(
+                        CATEGORY_ICONS[category.slug] ||
+                          CATEGORY_ICONS["default"],
+                        {
+                          size: 28,
+                          className: isSelected ? "text-[#1dc078]" : "",
+                        }
+                      )}
+                    </div>
+                    <span className="text-xs font-medium whitespace-nowrap">
+                      {category.name}
+                    </span>
+                  </div>
+                </Link>
+              );
+            })}
+            </nav>
+
+            {/* 우측 화살표 버튼 */}
+            {canScrollRight && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-2 top-1/2 -translate-y-1/2 z-10 h-8 w-8 bg-white shadow-lg hover:bg-gray-50 border border-gray-200 rounded-full hover:shadow-xl transition-all"
+                onClick={() => scroll("right")}
+              >
+                <ChevronRight className="h-4 w-4 text-gray-700" />
+              </Button>
+            )}
+          </>
+        )}
+        {/* 선택된 카테고리 아래 녹색 바 */}
+        {selectedBarStyle && (
+          <div
+            className="absolute bottom-0 h-1.5 bg-[#1dc078] transition-all duration-300"
+            style={{
+              left: `${selectedBarStyle.left}px`,
+              width: `${selectedBarStyle.width}px`,
+            }}
+          ></div>
         )}
       </div>
       <div className="border-b absolute bottom-0 w-screen left-1/2 -translate-x-1/2"></div>

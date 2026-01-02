@@ -48,6 +48,42 @@ export class SearchCourseDto {
   priceRange?: PriceRangeDto;
 
   @ApiProperty({
+    description: '할인 강의만 필터링',
+    required: false,
+    default: false,
+  })
+  @IsOptional()
+  @Type(() => Boolean)
+  discount?: boolean;
+
+  @ApiProperty({
+    description: '입문 난이도 강의만 필터링',
+    required: false,
+    default: false,
+  })
+  @IsOptional()
+  @Type(() => Boolean)
+  beginner?: boolean;
+
+  @ApiProperty({
+    description: '초급 난이도 강의만 필터링',
+    required: false,
+    default: false,
+  })
+  @IsOptional()
+  @Type(() => Boolean)
+  intermediate?: boolean;
+
+  @ApiProperty({
+    description: '중급 난이도 강의만 필터링',
+    required: false,
+    default: false,
+  })
+  @IsOptional()
+  @Type(() => Boolean)
+  advanced?: boolean;
+
+  @ApiProperty({
     description: '정렬 기준',
     required: false,
     enum: ['latest', 'popular', 'recommended', 'price_low', 'price_high'],
