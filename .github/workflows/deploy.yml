@@ -22,26 +22,42 @@ jobs:
           key: ${{ secrets.EC2_PRIVATE_KEY }}
           port: ${{ secrets.EC2_PORT || 22 }}
           script: |
+            set -euo pipefail
             cd /home/${{ secrets.EC2_USERNAME }}/inflearn-fullstack-clone
-
-            git pull
-
-            echo "이미지 빌드 시작"
-            sudo docker-compose build
-
-            echo "Prisma 마이그레이션 실행"
-            cd backend
-            pnpm prisma migrate deploy
-            cd ..
-
+            
+            echo "=== BEFORE ==="
+            git rev-parse --short HEAD || true
+            git status -sb || tru
+            
+            # 원격 기준으로 강제 동기화 (force-push/히스토리 변경에도 안전)
+            git fetch --all --prune
+            git checkout master
+            git reset --hard origin/master
+            git clean -fd
+            
+            echo "=== AFTER ==="
+            git rev-parse --short HEAD
+            git log -1 --oneline --decorate
+            
             echo "기존 컨테이너 중지 및 제거"
             sudo docker-compose down
-
+            
+            echo "이미지 빌드 시작"
+            sudo docker-compose build
+            
+            echo "Prisma 마이그레이션 실행"
+            sudo docker-compose run --rm backend pnpm prisma migrate deploy
+            git clean -fd
+            echo "=== AFTER ==="
+            git rev-parse --short HEAD
+            git log -1 --oneline --decorate
+            
             echo "새로운 컨테이너 시작"
             sudo docker-compose up -d
-
+            
             echo "사용하지 않는 이미지 정리"
             sudo docker image prune -f
-
+            
             echo "배포 완료"
             sudo docker-compose ps
+            #실패해서 한번더 실행
