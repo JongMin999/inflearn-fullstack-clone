@@ -51,25 +51,28 @@
 
 ## 🖼️ 스크린샷
 
-> **참고**: 실제 프로젝트 스크린샷 이미지를 추가하세요.
+<div align="center">
 
 ### 메인 페이지
-```
-[<img width="2560" height="1440" alt="image" src="https://github.com/user-attachments/assets/524f6794-ae80-4ebc-8416-1ee76ea37f7d" />
-]
-```
+<img width="1000" alt="메인 페이지 - 강의 목록" src="https://github.com/user-attachments/assets/4f052fb3-577d-4968-8cce-37ee0c8392f8" />
+
+*온라인 강의 플랫폼의 메인 페이지로, 다양한 프로그래밍 강의를 카테고리별로 탐색할 수 있습니다.*
+
+---
 
 ### 강의 상세 페이지
-```
-[<img width="1301" height="1261" alt="강의 상세페이지" src="https://github.com/user-attachments/assets/af0dc28e-414d-407d-a693-f0feda64ef76" />
-]
-```
+<img width="1000" alt="강의 상세 페이지 - React TypeScript 완전정복" src="https://github.com/user-attachments/assets/8e98f2af-385c-4d18-8d29-d188acc3d971" />
+
+*강의 상세 정보, 커리큘럼, 리뷰, 수강 신청 기능을 제공하는 페이지입니다.*
+
+---
 
 ### 강사 대시보드
-```
-[<img width="1400" height="1232" alt="강의 대시보드" src="https://github.com/user-attachments/assets/48acdd29-1bad-484b-8206-68dccb4f4672" />
-]
-```
+<img width="1000" alt="강사 대시보드 - 강의 관리" src="https://github.com/user-attachments/assets/a3362a2b-f75e-4846-9d09-8a4d03b8014d" />
+
+*강사가 자신의 강의를 관리하고 통계를 확인할 수 있는 관리자 대시보드입니다.*
+
+</div>
 
 ---
 
