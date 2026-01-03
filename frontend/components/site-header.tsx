@@ -486,7 +486,30 @@ export default function SiteHeader({
               </button>
               <button
                 className="group w-full text-left px-4 py-3 hover:bg-[#1dc078]/10 transition-colors focus:outline-none border-t border-gray-100"
-                onClick={() => signOut()}
+                onClick={async () => {
+                  // 카카오 로그아웃도 함께 처리 (세션 초기화로 다음 로그인 시 계정 선택 가능)
+                  const kakaoClientId = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID;
+                  if (kakaoClientId) {
+                    // 카카오 로그아웃 URL (로그아웃 후 현재 페이지로 리다이렉트)
+                    const currentUrl = window.location.origin;
+                    const logoutRedirectUri = encodeURIComponent(currentUrl);
+                    const kakaoLogoutUrl = `https://kauth.kakao.com/oauth/logout?client_id=${kakaoClientId}&logout_redirect_uri=${logoutRedirectUri}`;
+                    
+                    // 카카오 로그아웃을 위해 iframe으로 처리 (백그라운드 로그아웃)
+                    const iframe = document.createElement("iframe");
+                    iframe.style.display = "none";
+                    iframe.src = kakaoLogoutUrl;
+                    document.body.appendChild(iframe);
+                    
+                    // 로그아웃 처리 후 iframe 제거
+                    setTimeout(() => {
+                      document.body.removeChild(iframe);
+                    }, 1000);
+                  }
+                  
+                  // NextAuth 로그아웃
+                  await signOut({ callbackUrl: "/" });
+                }}
               >
                 <div className="font-semibold text-gray-800 group-hover:text-[#1dc078] transition-colors">로그아웃</div>
               </button>
