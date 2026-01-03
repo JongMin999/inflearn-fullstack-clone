@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { Eye, EyeOff, Mail, Lock, LogIn } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function SigninPage() {
   const [email, setEmail] = useState("");
@@ -13,6 +13,23 @@ export default function SigninPage() {
   const [errorMessage, setErrorMessage] = useState(""); // 에러 메시지 상태
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // URL 파라미터에서 에러 확인
+  useEffect(() => {
+    const error = searchParams.get("error");
+    if (error) {
+      if (error === "Configuration") {
+        setErrorMessage("OAuth 설정 오류가 발생했습니다. 관리자에게 문의하세요.");
+      } else if (error === "AccessDenied") {
+        setErrorMessage("로그인 접근이 거부되었습니다.");
+      } else if (error === "Verification") {
+        setErrorMessage("인증 오류가 발생했습니다.");
+      } else {
+        setErrorMessage(`로그인 오류: ${error}`);
+      }
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
