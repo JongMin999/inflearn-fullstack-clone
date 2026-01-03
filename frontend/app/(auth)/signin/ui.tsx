@@ -3,9 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { signIn } from "next-auth/react";
-import { Eye, EyeOff, Mail, Lock, LogIn } from "lucide-react"; // 아이콘 import 추가
+import { Eye, EyeOff, Mail, Lock, LogIn } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Metadata } from "next";
 
 export default function SigninPage() {
   const [email, setEmail] = useState("");
@@ -28,16 +27,25 @@ export default function SigninPage() {
       });
 
       if (result?.error) {
-        setErrorMessage("이메일 또는 비밀번호가 올바르지 않습니다.");
+        console.error("Login error:", result.error);
+        // NextAuth 에러 코드에 따라 다른 메시지 표시
+        if (result.error === "CredentialsSignin") {
+          setErrorMessage("이메일 또는 비밀번호가 올바르지 않습니다.");
+        } else {
+          setErrorMessage(`로그인 오류: ${result.error}`);
+        }
         setIsLoading(false);
       } else if (result?.ok) {
         // 로그인 성공 시 루트 페이지로 이동
         router.push("/");
         router.refresh();
+      } else {
+        setErrorMessage("로그인에 실패했습니다. 다시 시도해주세요.");
+        setIsLoading(false);
       }
     } catch (err) {
-      console.error(err);
-      setErrorMessage("로그인 중 오류가 발생했습니다.");
+      console.error("Login exception:", err);
+      setErrorMessage(`로그인 중 오류가 발생했습니다: ${err instanceof Error ? err.message : "알 수 없는 오류"}`);
       setIsLoading(false);
     }
   };
@@ -108,6 +116,70 @@ export default function SigninPage() {
           아직 회원이 아니신가요? 회원가입
         </Link>
       </form>
+
+      {/* 소셜 로그인 구분선 */}
+      <div className="flex items-center gap-4 w-full max-w-[300px] md:max-w-[400px] my-4">
+        <div className="flex-1 h-px bg-gray-300"></div>
+        <span className="text-xs md:text-sm text-gray-500">또는</span>
+        <div className="flex-1 h-px bg-gray-300"></div>
+      </div>
+
+      {/* 소셜 로그인 버튼 */}
+      <div className="flex flex-col gap-3 w-full max-w-[300px] md:max-w-[400px]">
+        <button
+          type="button"
+          onClick={() => signIn("kakao", { callbackUrl: "/" })}
+          className="w-full bg-[#FEE500] text-black font-medium rounded-md py-2.5 md:py-3 px-3 md:px-4 flex items-center justify-center gap-3 text-xs md:text-sm hover:bg-[#FDD835] transition-colors min-h-[42px]"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="flex-shrink-0">
+            <path
+              d="M12 3C6.477 3 2 6.58 2 11c0 3.57 2.4 6.72 6 8.38v2.36L10.24 19.5c.53.05 1.07.08 1.76.08 5.523 0 10-3.58 10-8s-4.477-8-10-8z"
+              fill="#000000"
+            />
+          </svg>
+          <span className="whitespace-nowrap">카카오로 시작하기</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => signIn("google", { callbackUrl: "/" })}
+          className="w-full bg-white border border-gray-300 text-gray-700 font-medium rounded-md p-2.5 md:p-3 flex items-center justify-center gap-3 text-xs md:text-sm hover:bg-gray-50 transition-colors"
+        >
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" className="flex-shrink-0">
+            <path
+              d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"
+              fill="#4285F4"
+            />
+            <path
+              d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"
+              fill="#34A853"
+            />
+            <path
+              d="M3.964 10.707c-.18-.54-.282-1.117-.282-1.707s.102-1.167.282-1.707V4.961H.957C.348 6.175 0 7.55 0 9s.348 2.825.957 4.039l3.007-2.332z"
+              fill="#FBBC05"
+            />
+            <path
+              d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.961L3.964 7.293C4.672 5.163 6.656 3.58 9 3.58z"
+              fill="#EA4335"
+            />
+          </svg>
+          <span className="whitespace-nowrap">Google로 시작하기</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => signIn("naver", { callbackUrl: "/" })}
+          className="w-full bg-[#03C75A] text-white font-medium rounded-md py-2.5 md:py-3 px-3 md:px-4 flex items-center justify-center gap-3 text-xs md:text-sm hover:bg-[#02B350] transition-colors min-h-[42px]"
+        >
+          <svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" className="flex-shrink-0">
+            <path
+              d="M0 0v18h4.05V8.1L13.5 18h4.5V0h-4.05v9.9L4.05 0H0z"
+              fill="#FFFFFF"
+            />
+          </svg>
+          <span className="whitespace-nowrap">네이버로 시작하기</span>
+        </button>
+      </div>
     </div>
   );
 }
