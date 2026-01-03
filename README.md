@@ -7,14 +7,8 @@
 온라인 강의 플랫폼의 핵심 기능을 구현한 TypeScript 기반 풀스택 프로젝트
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-배포%20사이트-blue?style=for-the-badge)](https://inflearn-clone.malrang.space)
-[![GitHub](https://img.shields.io/badge/GitHub-Repository-black?style=for-the-badge&logo=github)](https://github.com/your-username/inflearn-fullstack-clone)
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-black?style=for-the-badge&logo=github)](https://github.com/JongMin999/inflearn-fullstack-clone)
 [![API Docs](https://img.shields.io/badge/API-Swagger-green?style=for-the-badge)](http://localhost:8000/api)
-
-![GitHub Actions](https://img.shields.io/github/actions/workflow/status/your-username/inflearn-fullstack-clone/deploy.yml?branch=master&label=CI/CD&logo=github-actions&style=for-the-badge)
-![GitHub last commit](https://img.shields.io/github/last-commit/your-username/inflearn-fullstack-clone?style=for-the-badge)
-![GitHub repo size](https://img.shields.io/github/repo-size/your-username/inflearn-fullstack-clone?style=for-the-badge)
-![GitHub language count](https://img.shields.io/github/languages/count/your-username/inflearn-fullstack-clone?style=for-the-badge)
-![GitHub top language](https://img.shields.io/github/languages/top/your-username/inflearn-fullstack-clone?style=for-the-badge)
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
 ![NestJS](https://img.shields.io/badge/NestJS-E0234E?style=for-the-badge&logo=nestjs&logoColor=white)
