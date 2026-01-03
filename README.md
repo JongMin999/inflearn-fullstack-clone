@@ -49,33 +49,6 @@
 
 ---
 
-## 🖼️ 스크린샷
-
-<div align="center">
-
-### 메인 페이지
-<img width="1000" alt="메인 페이지 - 강의 목록" src="https://github.com/user-attachments/assets/4f052fb3-577d-4968-8cce-37ee0c8392f8" />
-
-*온라인 강의 플랫폼의 메인 페이지로, 다양한 프로그래밍 강의를 카테고리별로 탐색할 수 있습니다.*
-
----
-
-### 강의 상세 페이지
-<img width="1000" alt="강의 상세 페이지 - React TypeScript 완전정복" src="https://github.com/user-attachments/assets/8e98f2af-385c-4d18-8d29-d188acc3d971" />
-
-*강의 상세 정보, 커리큘럼, 리뷰, 수강 신청 기능을 제공하는 페이지입니다.*
-
----
-
-### 강사 대시보드
-<img width="1000" alt="강사 대시보드 - 강의 관리" src="https://github.com/user-attachments/assets/a3362a2b-f75e-4846-9d09-8a4d03b8014d" />
-
-*강사가 자신의 강의를 관리하고 통계를 확인할 수 있는 관리자 대시보드입니다.*
-
-</div>
-
----
-
 ## ✨ 주요 기능
 
 ### 👤 사용자 기능
@@ -262,6 +235,38 @@ const courses = await prisma.course.findMany({
 - **강사 답글**: 강사가 리뷰에 답글 작성 가능
 - **리뷰 정렬**: 최신순, 오래된순, 평점순 정렬
 - **리뷰 필터링**: 답글이 없는 리뷰 우선 표시
+
+---
+
+## 🖼️ 스크린샷
+
+<div align="center">
+
+### 로그인 페이지
+<img width="500" height="1069" alt="Image" src="https://github.com/user-attachments/assets/09fd8bb6-aab1-499f-ba33-91cb9ad1b691" />
+
+*로그인 페이지로, 카카오톡, 구글, 네이버등 연동 로그인과 자체 홈페이지 로그인이 가능합니다.*
+
+### 메인 페이지
+<img width="500" alt="메인 페이지 - 강의 목록" src="https://github.com/user-attachments/assets/4f052fb3-577d-4968-8cce-37ee0c8392f8" />
+
+*온라인 강의 플랫폼의 메인 페이지로, 다양한 프로그래밍 강의를 카테고리별로 탐색할 수 있습니다.*
+
+---
+
+### 강의 상세 페이지
+<img width="500" alt="강의 상세 페이지 - React TypeScript 완전정복" src="https://github.com/user-attachments/assets/8e98f2af-385c-4d18-8d29-d188acc3d971" />
+
+*강의 상세 정보, 커리큘럼, 리뷰, 수강 신청 기능을 제공하는 페이지입니다.*
+
+---
+
+### 강사 대시보드
+<img width="500" alt="강사 대시보드 - 강의 관리" src="https://github.com/user-attachments/assets/a3362a2b-f75e-4846-9d09-8a4d03b8014d" />
+
+*강사가 자신의 강의를 관리하고 통계를 확인할 수 있는 관리자 대시보드입니다.*
+
+</div>
 
 ---
 
