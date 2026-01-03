@@ -34,7 +34,7 @@
 - **최신 기술 스택**: Next.js 15, NestJS 10, React 19 등 최신 기술 활용
 
 ### ⏱️ 개발 기간
-**2024.12 ~ 2025.01** (약 1개월)
+**2024.12 ~ 2025.01** (약 7개월)
 
 ### 👥 개발 인원
 **1명** (풀스택 개발)
@@ -55,17 +55,20 @@
 
 ### 메인 페이지
 ```
-[스크린샷 이미지: 강의 목록 페이지]
+[<img width="2560" height="1440" alt="image" src="https://github.com/user-attachments/assets/524f6794-ae80-4ebc-8416-1ee76ea37f7d" />
+]
 ```
 
 ### 강의 상세 페이지
 ```
-[스크린샷 이미지: 강의 상세 정보 및 리뷰]
+[<img width="1301" height="1261" alt="강의 상세페이지" src="https://github.com/user-attachments/assets/af0dc28e-414d-407d-a693-f0feda64ef76" />
+]
 ```
 
 ### 강사 대시보드
 ```
-[스크린샷 이미지: 강의 생성 및 관리 화면]
+[<img width="1400" height="1232" alt="강의 대시보드" src="https://github.com/user-attachments/assets/48acdd29-1bad-484b-8206-68dccb4f4672" />
+]
 ```
 
 ---
