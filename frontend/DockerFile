@@ -48,6 +48,9 @@ COPY . .
 
 RUN pnpm prisma generate
 
+# Clear Next.js cache before build
+RUN rm -rf .next
+
 RUN pnpm run build
 
 EXPOSE 3000

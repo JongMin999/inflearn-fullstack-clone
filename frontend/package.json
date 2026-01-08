@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "lint": "next lint",
-    "build": "next build --turbopack",
+    "build": "next build",
     "start": "next start",
     "openapi-ts": "openapi-ts"
   },
