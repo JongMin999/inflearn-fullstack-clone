@@ -1,0 +1,143 @@
+name: EC2 배포자동화 v1
+
+on:
+  push:
+    branches: [ master ]
+    paths-ignore:
+      - 'README.md'
+      - '**.md'
+      - 'docs/**'
+      - '.github/**'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build_and_push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      repo_lc: ${{ steps.vars.outputs.repo_lc }}
+      backend_changed: ${{ steps.changes.outputs.backend }}
+      frontend_changed: ${{ steps.changes.outputs.frontend }}
+      migrations_changed: ${{ steps.changes.outputs.migrations }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Detect changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            frontend:
+              - 'frontend/**'
+            migrations:
+              - 'backend/prisma/migrations/**'
+
+      - name: Make lowercase repo name (for GHCR)
+        id: vars
+        run: |
+          echo "repo_lc=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR (push)
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push backend
+        if: steps.changes.outputs.backend == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/DockerFile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.vars.outputs.repo_lc }}-backend:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ steps.vars.outputs.repo_lc }}-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build & Push frontend
+        if: steps.changes.outputs.frontend == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/DockerFile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.vars.outputs.repo_lc }}-frontend:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ steps.vars.outputs.repo_lc }}-frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build_and_push
+    runs-on: ubuntu-latest
+    if: needs.build_and_push.outputs.backend_changed == 'true' || needs.build_and_push.outputs.frontend_changed == 'true'
+
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_PRIVATE_KEY }}
+          port: ${{ secrets.EC2_PORT || 22 }}
+          script: |
+            set -euo pipefail
+            cd /home/${{ secrets.EC2_USERNAME }}/inflearn-fullstack-clone
+
+            echo "=== SYNC REPO ==="
+            git fetch --all --prune
+            git checkout master
+            git reset --hard origin/master
+            git clean -fd -e .env -e .env.* || true
+
+            TAG='${{ github.sha }}'
+            IMAGE_PREFIX='ghcr.io/${{ needs.build_and_push.outputs.repo_lc }}'
+
+            echo "=== LOGIN GHCR (pull) ==="
+            echo "${{ secrets.GHCR_TOKEN }}" | sudo docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
+
+            SERVICES=""
+            if [ "${{ needs.build_and_push.outputs.backend_changed }}" = "true" ]; then SERVICES="$SERVICES backend"; fi
+            if [ "${{ needs.build_and_push.outputs.frontend_changed }}" = "true" ]; then SERVICES="$SERVICES frontend"; fi
+
+            echo "SERVICES:$SERVICES"
+
+            echo "=== PULL (changed services only) ==="
+            sudo TAG="$TAG" IMAGE_PREFIX="$IMAGE_PREFIX" docker compose -f docker-compose.prod.yml pull $SERVICES
+
+            echo "=== UP (changed services only) ==="
+            sudo TAG="$TAG" IMAGE_PREFIX="$IMAGE_PREFIX" docker compose -f docker-compose.prod.yml up -d --no-build --remove-orphans --no-deps $SERVICES
+
+            echo "=== PRISMA MIGRATE (only when migrations changed) ==="
+            if [ "${{ needs.build_and_push.outputs.migrations_changed }}" = "true" ]; then
+              sudo TAG="$TAG" IMAGE_PREFIX="$IMAGE_PREFIX" docker compose -f docker-compose.prod.yml exec -T backend pnpm prisma migrate deploy
+            else
+              echo "Skip migrations (no changes)."
+            fi
+
+            echo "=== CLEANUP (non-fatal) ==="
+            sudo docker container prune -f || true
+            sudo docker image prune -f || true
+
+            echo "=== DONE ==="
+            sudo TAG="$TAG" IMAGE_PREFIX="$IMAGE_PREFIX" docker compose -f docker-compose.prod.yml ps

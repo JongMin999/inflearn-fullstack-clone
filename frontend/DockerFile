@@ -1,58 +1,51 @@
-FROM node:20-alpine
+# syntax=docker/dockerfile:1.5
 
-RUN npm install -g pnpm
-
+FROM node:20-alpine AS base
+RUN npm i -g pnpm
 WORKDIR /app
 
-# Build arguments
+# 1) deps
+FROM base AS deps
+COPY package.json pnpm-lock.yaml ./
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile --store-dir=/pnpm/store
+
+# 2) builder
+FROM base AS builder
+
+# 빌드에 필요한 "공개" 값만 받기 (시크릿은 빌드에 넣지 말 것)
 ARG NODE_ENV=production
 ARG API_URL
-ARG AUTH_SECRET
-ARG DATABASE_URL
-ARG CLOUD_FRONT_DOMAIN
+ARG USE_HTTPS
 ARG NEXT_PUBLIC_PORTONE_STORE_ID
 ARG NEXT_PUBLIC_PORTONE_CHANNEL_KEY
-ARG NEXTAUTH_URL
-ARG GOOGLE_CLIENT_ID
-ARG GOOGLE_CLIENT_SECRET
-ARG KAKAO_CLIENT_ID
-ARG KAKAO_CLIENT_SECRET
 ARG NEXT_PUBLIC_KAKAO_CLIENT_ID
-ARG NAVER_CLIENT_ID
-ARG NAVER_CLIENT_SECRET
-ARG USE_HTTPS
 
-# Convert ARG to ENV for runtime
 ENV NODE_ENV=${NODE_ENV}
 ENV API_URL=${API_URL}
-ENV AUTH_SECRET=${AUTH_SECRET}
-ENV DATABASE_URL=${DATABASE_URL}
-ENV CLOUD_FRONT_DOMAIN=${CLOUD_FRONT_DOMAIN}
+ENV USE_HTTPS=${USE_HTTPS}
 ENV NEXT_PUBLIC_PORTONE_STORE_ID=${NEXT_PUBLIC_PORTONE_STORE_ID}
 ENV NEXT_PUBLIC_PORTONE_CHANNEL_KEY=${NEXT_PUBLIC_PORTONE_CHANNEL_KEY}
-ENV NEXTAUTH_URL=${NEXTAUTH_URL}
-ENV GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-ENV GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-ENV KAKAO_CLIENT_ID=${KAKAO_CLIENT_ID}
-ENV KAKAO_CLIENT_SECRET=${KAKAO_CLIENT_SECRET}
 ENV NEXT_PUBLIC_KAKAO_CLIENT_ID=${NEXT_PUBLIC_KAKAO_CLIENT_ID}
-ENV NAVER_CLIENT_ID=${NAVER_CLIENT_ID}
-ENV NAVER_CLIENT_SECRET=${NAVER_CLIENT_SECRET}
-ENV USE_HTTPS=${USE_HTTPS}
 
-COPY package.json pnpm-lock.yaml ./
-
-RUN pnpm install
-
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-RUN pnpm prisma generate
+# 필요하면 유지(프론트에서 prisma generate가 정말 필요한 경우만)
+RUN pnpm prisma generate || true
 
-# Clear Next.js cache before build
-RUN rm -rf .next
+RUN pnpm build
 
-RUN pnpm run build
+# 3) runner (최소 런타임)
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# standalone 결과만 복사 (여기엔 런타임에 필요한 node_modules 일부도 포함됨)
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
 
 EXPOSE 3000
-
-CMD ["pnpm", "run", "start"]
+CMD ["node", "server.js"]

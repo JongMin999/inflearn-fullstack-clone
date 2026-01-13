@@ -1,0 +1,58 @@
+version: "3.8"
+
+services:
+  backend:
+    image: ${IMAGE_PREFIX}-backend:${TAG}
+    container_name: inflearn-clone-backend
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    networks:
+      - app-network
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      AUTH_SECRET: ${AUTH_SECRET}
+
+      AWS_REGION: ${AWS_REGION}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_MEDIA_S3_BUCKET_NAME: ${AWS_MEDIA_S3_BUCKET_NAME}
+      CLOUD_FRONT_DOMAIN: ${CLOUD_FRONT_DOMAIN}
+
+      PORTONE_API_SECRET: ${PORTONE_API_SECRET}
+      PORTONE_WEBHOOK_SECRET: ${PORTONE_WEBHOOK_SECRET}
+
+  frontend:
+    image: ${IMAGE_PREFIX}-frontend:${TAG}
+    container_name: inflearn-clone-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - app-network
+    environment:
+      NODE_ENV: production
+      API_URL: http://backend:8000
+      USE_HTTPS: ${USE_HTTPS}
+
+      AUTH_SECRET: ${AUTH_SECRET}
+      DATABASE_URL: ${DATABASE_URL}
+      CLOUD_FRONT_DOMAIN: ${CLOUD_FRONT_DOMAIN}
+      NEXT_PUBLIC_PORTONE_STORE_ID: ${NEXT_PUBLIC_PORTONE_STORE_ID}
+      NEXT_PUBLIC_PORTONE_CHANNEL_KEY: ${NEXT_PUBLIC_PORTONE_CHANNEL_KEY}
+
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID}
+      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET}
+      NEXT_PUBLIC_KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID}
+      NAVER_CLIENT_ID: ${NAVER_CLIENT_ID}
+      NAVER_CLIENT_SECRET: ${NAVER_CLIENT_SECRET}
+
+networks:
+  app-network:
+    driver: bridge
