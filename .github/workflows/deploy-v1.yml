@@ -75,7 +75,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Build & Push frontend
-        if: steps.changes.outputs.frontend == 'true'
+        if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
         uses: docker/build-push-action@v6
         with:
           context: ./frontend
@@ -84,6 +84,13 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ steps.vars.outputs.repo_lc }}-frontend:${{ github.sha }}
             ${{ env.REGISTRY }}/${{ steps.vars.outputs.repo_lc }}-frontend:latest
+          build-args: |
+            NODE_ENV=production
+            API_URL=http://backend:8000
+            USE_HTTPS=true
+            NEXT_PUBLIC_PORTONE_STORE_ID=${{ secrets.NEXT_PUBLIC_PORTONE_STORE_ID }}
+            NEXT_PUBLIC_PORTONE_CHANNEL_KEY=${{ secrets.NEXT_PUBLIC_PORTONE_CHANNEL_KEY }}
+            NEXT_PUBLIC_KAKAO_CLIENT_ID=${{ secrets.NEXT_PUBLIC_KAKAO_CLIENT_ID }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
