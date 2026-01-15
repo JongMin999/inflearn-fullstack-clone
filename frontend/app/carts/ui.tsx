@@ -212,11 +212,19 @@ export default function CartUI() {
         return;
       }
 
-      // 유료 결제는 PortOne 결제 창 띄우기
+      const portoneStoreId = process.env.NEXT_PUBLIC_PORTONE_STORE_ID;
+      const portoneChannelKey = process.env.NEXT_PUBLIC_PORTONE_CHANNEL_KEY;
+      if (!portoneStoreId || !portoneChannelKey) {
+        showErrorDialog(
+          "결제 설정 오류",
+          "결제 설정 값이 누락되었습니다. 관리자에게 문의해주세요."
+        );
+        setIsPaymentProcessing(false);
+        return;
+      }
       const payment = await PortOne.requestPayment({
-        storeId: process.env.NEXT_PUBLIC_PORTONE_STORE_ID || "store-test",
-        channelKey:
-          process.env.NEXT_PUBLIC_PORTONE_CHANNEL_KEY || "channel-test-key",
+        storeId: portoneStoreId,
+        channelKey: portoneChannelKey,
         paymentId,
         orderName,
         totalAmount: selectedTotalDiscountPrice,

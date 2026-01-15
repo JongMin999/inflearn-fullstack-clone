@@ -867,6 +867,8 @@ function FloatingMenu({
   const [isPaymentProcessing, setIsPaymentProcessing] = useState(false);
   const router = useRouter();
   const queryClient = useQueryClient();
+  const portoneStoreId = process.env.NEXT_PUBLIC_PORTONE_STORE_ID;
+  const portoneChannelKey = process.env.NEXT_PUBLIC_PORTONE_CHANNEL_KEY;
 
   const getFavoriteQuery = useQuery({
     queryKey: ["favorite", course.id],
@@ -990,10 +992,14 @@ function FloatingMenu({
       const finalPrice = course.discountPrice || course.price;
       const paymentId = generatePaymentId();
 
+      if (!portoneStoreId || !portoneChannelKey) {
+        toast.error("결제 설정 값이 누락되었습니다. 관리자에게 문의해주세요.");
+        return;
+      }
+
       const payment = await PortOne.requestPayment({
-        storeId: process.env.NEXT_PUBLIC_PORTONE_STORE_ID || "store-test",
-        channelKey:
-          process.env.NEXT_PUBLIC_PORTONE_CHANNEL_KEY || "channel-test-key",
+        storeId: portoneStoreId,
+        channelKey: portoneChannelKey,
         paymentId,
         orderName: course.title,
         totalAmount: finalPrice,
@@ -1040,7 +1046,7 @@ function FloatingMenu({
     } finally {
       setIsPaymentProcessing(false);
     }
-  }, [user, course, queryClient]);
+  }, [user, course, queryClient, portoneStoreId, portoneChannelKey]);
 
   const handleEnroll = useCallback(async () => {
     if (isEnrolled) {
